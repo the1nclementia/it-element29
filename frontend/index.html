@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ИТ-элемент [29] — состояние сервера</title>
+  <link rel="icon" type="image/png" href="/brand/mark-original.png">
+  <link rel="stylesheet" href="/status.css">
+  <script src="/status.js" defer></script>
+</head>
+<body>
+  <main>
+    <img class="logo" src="/brand/wordmark-original.png" alt="ИТ-элемент [29]" width="240" height="251">
+    <p class="eyebrow">Этап 1 · серверный каркас</p>
+    <h1>Состояние системы</h1>
+    <p>Техническая страница проверки API и подключения к PostgreSQL.</p>
+    <dl>
+      <div><dt>Сервер</dt><dd id="live" aria-live="polite">Проверка…</dd></div>
+      <div><dt>База данных и миграции</dt><dd id="ready" aria-live="polite">Проверка…</dd></div>
+    </dl>
+    <button id="refresh" type="button">Проверить ещё раз</button>
+    <p id="checked" class="muted" aria-live="polite"></p>
+    <p class="muted">Авторизация, склад, оборудование и остальные рабочие разделы пока не реализованы.</p>
+    <noscript>Для проверки состояния включите JavaScript или откройте /api/v1/health/ready.</noscript>
+  </main>
+</body>
+</html>

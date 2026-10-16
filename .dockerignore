@@ -1,0 +1,11 @@
+.git
+.venv
+.scratch
+.env
+.env.*
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+backups
+data
+uploads

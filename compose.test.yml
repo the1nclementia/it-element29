@@ -1,0 +1,37 @@
+# Dedicated disposable PostgreSQL. Never uses the main Compose volumes or .env credentials.
+name: element29-tests
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: element29_test
+      POSTGRES_USER: element29_test
+      POSTGRES_PASSWORD: disposable-test-only
+      TZ: UTC
+      PGTZ: UTC
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "element29_test", "-d", "element29_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    networks: [test]
+  tests:
+    build:
+      context: ./backend
+      target: test
+    environment:
+      RUN_DB_TESTS: "1"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: element29_test
+      POSTGRES_USER: element29_test
+      POSTGRES_PASSWORD: disposable-test-only
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [test]
+networks:
+  test:
+    internal: true
