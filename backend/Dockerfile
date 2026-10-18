@@ -13,7 +13,8 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 USER 10001:10001
 EXPOSE 8000
-CMD ["python", "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
+# Only trusted Compose services can reach this unpublished port. Nginx replaces XFF.
+CMD ["python", "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*", "--no-access-log"]
 
 FROM runtime AS test
 USER root

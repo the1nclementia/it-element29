@@ -28,3 +28,32 @@ def test_special_characters_are_not_parsed_as_url_delimiters():
 def test_invalid_database_port_is_rejected(port):
     with pytest.raises(ValidationError):
         Settings(postgres_password="test-only", postgres_port=port, _env_file=None)
+
+
+def test_production_rejects_insecure_cookie_or_http_origin():
+    with pytest.raises(ValidationError):
+        Settings(postgres_password="test-only", environment="production", _env_file=None)
+    with pytest.raises(ValidationError):
+        Settings(
+            postgres_password="test-only",
+            environment="production",
+            cookie_secure=True,
+            app_origins=["http://app.internal"],
+            _env_file=None,
+        )
+    assert Settings(
+        postgres_password="test-only",
+        environment="production",
+        cookie_secure=True,
+        app_origins=["https://app.internal"],
+        _env_file=None,
+    ).cookie_secure
+
+
+@pytest.mark.parametrize(
+    "origin",
+    ["*", "https://*.internal", "https://app.internal/path", "https://user:pass@app.internal"],
+)
+def test_unsafe_origin_configuration_rejected(origin):
+    with pytest.raises(ValidationError):
+        Settings(postgres_password="test-only", app_origins=[origin], _env_file=None)

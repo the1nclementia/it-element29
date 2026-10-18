@@ -19,18 +19,38 @@ created_at и updated_at имеют серверный DEFAULT now(); updated_at
 UPDATE. Прямой SQL-писатель обязан обновить updated_at явно. UUID создаёт приложение.
 Все даты timezone-aware. Имена FK/UK/CK/индексов детерминированы.
 
+## Физическая схема этапа 2
+
+Миграция `0002_identity` добавляет следующие таблицы; `0001_directories` не изменялась.
+
+| Таблица | Ключ и поля | Ограничения |
+|---|---|---|
+| users | UUID, username, display_name, password_hash, role_code, is_active, must_change_password, created_at/updated_at/archived_at | нормализованный уникальный логин, непустое имя, FK roles RESTRICT |
+| roles | code PK, name | четыре роли, фиксированные seed-данные миграции |
+| permissions | code PK | серверные разрешения |
+| role_permissions | role_code + permission_code PK | FK RESTRICT |
+| sessions | token_hash PK, user_id nullable, created_at, expires_at | SHA-256 токена, FK users RESTRICT; индексы user_id/expiry |
+| auth_rate_limits | key_hash PK, attempts, window_start | attempts > 0, атомарный PostgreSQL upsert |
+| audit_logs | UUID, actor_id nullable, action, target_id nullable, changes JSONB, occurred_at | FK actor RESTRICT; runtime только SELECT/INSERT |
+
+У пользователя одна роль через `users.role_code`; M:N user_roles и связь с employees
+не добавлялись без нужды текущего этапа. Коды roles/permissions и хеши технических
+сессий/лимитов — естественные ключи; бизнес-сущности используют UUID.
+Отзыв сессии удаляет её техническую запись, сохраняя аудит и пользователя.
+Все временные поля — timestamptz UTC. Аудит содержит только разрешённые поля изменений,
+никогда пароль, хеш пароля, bearer/CSRF-токен или тело запроса целиком.
+
 ## Целевая схема последующих этапов — ещё НЕ мигрирована
 
 | Этап | Сущности | Назначение и ключевые связи |
 |---|---|---|
-| 2 | users, roles, permissions, user_roles, role_permissions, sessions | users.employee_id nullable UNIQUE; логин нормализован UNIQUE; password_hash; sessions хранит хеш токена, expiry, revoke; связи M:N |
 | 3 | manufacturers, inventory_categories, printer_models, inventory_items, inventory_compatibilities | модель не глобально уникальна; производитель расходника отдельно от производителя принтера; M:N совместимость |
 | 3 | issue_documents, issue_document_items, inventory_movements | получатель FK employees, автор FK users; qty строк >0; signed delta движений !=0; ссылки на документ и строку; тип receipt/issue/return/adjustment/reversal |
 | 4 | equipment_categories, equipment, equipment_links | serial_number nullable и индексируется, inventory_number UNIQUE nullable; category_id, location_id, responsible_employee_id, department_id, status, attributes JSONB |
 | 5 | equipment_movements, equipment_movement_items | документ и несколько equipment_id; снимки from/to location, employee, department; UUID устройств, причина, автор, occurred_at; отмена отдельным документом |
 | 6 | maintenance_records, maintenance_revisions | equipment_id, work_type, status, scheduled/completed_at, description, work_done, executor_id; версии содержат изменённые поля |
 | 3+ | file_attachments и типизированные таблицы связей | storage_key UUID, media_type, size, hash, uploader; FK к владельцу через inventory_item_attachments/equipment_attachments, а не незащищённый polymorphic FK |
-| 2+ | audit_logs | actor_id nullable, timestamp, action, entity_type, entity_id, before/after JSONB без секретов; append-only для runtime роли |
+| 3+ | расширение audit_logs | аудит документов/оборудования добавляется вместе с реальными бизнес-операциями |
 | позже | import_batches, import_rows | staging, mapping, errors, confirmation, source hash; импорт GLPI.xlsx только после предпросмотра и подтверждения |
 
 ```mermaid
@@ -66,8 +86,9 @@ inventory_items не создаётся. При записи lock строки �
 
 **Аудит:** отличается от журнала бизнес-операций; записывается в той же транзакции.
 Секреты исключаются по allowlist полей. Runtime роль не получает UPDATE/DELETE audit_logs.
-Роль мигратора и runtime будут разделены при внедрении авторизации этапа 2; текущий
-Compose использует bootstrap owner только для пустого технического окружения.
+Роль мигратора и runtime разделяет `app.cli provision-db-role`. После новой миграции
+deploy повторяет выдачу разрешений. Старый dev .env без APP_DB_* сохраняет owner fallback;
+production такого fallback не допускает. Runtime не получает CREATE и удаление users.
 
 Индексы следующих этапов: inventory_movements(item_id, occurred_at), equipment(serial_number),
 equipment(location_id, status), movement_items(equipment_id), maintenance(equipment_id, date),

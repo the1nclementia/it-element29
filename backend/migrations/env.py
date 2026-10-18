@@ -4,6 +4,7 @@ from app.core.config import Settings
 from app.db.base import Base
 from app.db.session import build_engine
 from app.modules.directory import models  # noqa: F401
+from app.modules.identity import models as identity_models  # noqa: F401
 
 target_metadata = Base.metadata
 

@@ -1,0 +1,131 @@
+# Standalone server Compose. Existing root docker-compose.yml is development only.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+x-runtime-env: &runtime-env
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: ${POSTGRES_DB:?required}
+  POSTGRES_USER: ${APP_DB_USER:?required}
+  POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?required}
+  ENVIRONMENT: production
+  COOKIE_SECURE: "true"
+  APP_ORIGINS: ${APP_ORIGINS:?required}
+  ENABLE_API_DOCS: "false"
+x-backend: &backend
+  image: ${BACKEND_IMAGE:?required}
+  pull_policy: never
+  environment: *runtime-env
+  networks: [internal]
+  volumes:
+    - files:/app/uploads
+  logging: *logging
+  security_opt: [no-new-privileges:true]
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?required}
+    pull_policy: never
+    restart: unless-stopped
+    command: [postgres, -c, log_error_verbosity=terse, -c, log_min_error_statement=panic, -c, log_statement=none, -c, log_parameter_max_length_on_error=0]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    networks: [internal]
+    logging: *logging
+  backend:
+    <<: *backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=10)"]
+      interval: 10s
+      timeout: 12s
+      retries: 12
+      start_period: 15s
+  frontend:
+    image: ${FRONTEND_IMAGE:?required}
+    pull_policy: never
+    restart: unless-stopped
+    networks: [internal]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1/]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+    security_opt: [no-new-privileges:true]
+  proxy:
+    image: ${PROXY_IMAGE:?required}
+    pull_policy: never
+    restart: unless-stopped
+    ports:
+      - "${HTTPS_BIND:?required}:${HTTPS_PORT:?required}:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TLS_DIRECTORY:?required}:/etc/nginx/tls:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks: [edge, internal]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8081/api/v1/health/ready]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+    security_opt: [no-new-privileges:true]
+  owner-ops:
+    <<: *backend
+    profiles: [ops]
+    environment:
+      <<: *runtime-env
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      APP_DB_USER: ${APP_DB_USER:?required}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?required}
+    command: [python, -m, alembic, current]
+  runtime-ops:
+    <<: *backend
+    profiles: [ops]
+    command: [python, -m, app.cli, --help]
+  file-ops:
+    image: ${BACKEND_IMAGE:?required}
+    pull_policy: never
+    profiles: [ops]
+    user: "0:0"
+    network_mode: none
+    logging: *logging
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - files:/app/uploads
+      - ../scripts/deploy/file_archive.py:/tools/file_archive.py:ro
+    command: [python, /tools/file_archive.py, check, /backup/files.tar.gz]
+
+networks:
+  edge:
+  internal:
+    internal: true
+volumes:
+  postgres:
+    external: true
+    name: ${DATA_PREFIX:?required}-postgres
+  files:
+    external: true
+    name: ${DATA_PREFIX:?required}-files

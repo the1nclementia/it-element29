@@ -9,3 +9,10 @@
 backups
 data
 uploads
+**/node_modules
+**/.pnpm-store
+**/dist
+**/.vite
+**/coverage
+**/.venv
+**/__pycache__
