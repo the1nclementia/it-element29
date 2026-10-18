@@ -15,6 +15,12 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Settings } from './pages/Settings';
 import { Users } from './pages/Users';
+import { Inventory } from './pages/Inventory';
+import { ItemDetails } from './pages/ItemDetails';
+import { Documents, DocumentDetails } from './pages/Documents';
+import { Directory } from './pages/Directory';
+import { StockForm } from './features/issues/StockForm';
+import { WarehouseProvider } from './features/issues/state';
 export function ProtectedRoute({
   children,
   permission,
@@ -63,7 +69,7 @@ function Placeholder({ path }: { path: string }) {
   );
 }
 export function AppRoutes() {
-  const { loading, error, restore } = useAuth();
+  const { loading, error, restore, user } = useAuth();
   if (loading) return <LoadingState />;
   if (error)
     return (
@@ -72,68 +78,142 @@ export function AppRoutes() {
       </div>
     );
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
+    <WarehouseProvider key={user?.id ?? 'anonymous'}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
         <Route
-          index
           element={
-            <ProtectedRoute permission="dashboard.read">
-              <Dashboard />
+            <ProtectedRoute>
+              <AppLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="settings"
-          element={
-            <ProtectedRoute permission="settings.read">
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="users"
-          element={
-            <ProtectedRoute permission="users.manage">
-              <Users />
-            </ProtectedRoute>
-          }
-        />
-        {modules
-          .filter(
-            (module) => !['/', '/users', '/settings'].includes(module.path),
-          )
-          .map((module) => (
-            <Route
-              key={module.path}
-              path={module.path.slice(1)}
-              element={
-                <ProtectedRoute permission={module.permission}>
-                  <Placeholder path={module.path} />
-                </ProtectedRoute>
-              }
-            />
-          ))}
-        <Route
-          path="*"
-          element={
-            <EmptyState
-              title="Страница не найдена"
-              description="Проверьте адрес или выберите нужный раздел в меню."
-            >
-              <Button className="mt-5" asChild>
-                <Link to="/">На главную</Link>
-              </Button>
-            </EmptyState>
-          }
-        />
-      </Route>
-    </Routes>
+        >
+          <Route
+            index
+            element={
+              <ProtectedRoute permission="dashboard.read">
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <ProtectedRoute permission="settings.read">
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="users"
+            element={
+              <ProtectedRoute permission="users.manage">
+                <Users />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory"
+            element={
+              <ProtectedRoute permission="inventory.read">
+                <Inventory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/items/:id"
+            element={
+              <ProtectedRoute permission="inventory.read">
+                <ItemDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/catalogs"
+            element={
+              <ProtectedRoute permission="inventory.read">
+                <Directory inventory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/documents"
+            element={
+              <ProtectedRoute permission="inventory.read">
+                <Documents />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/documents/:id"
+            element={
+              <ProtectedRoute permission="inventory.read">
+                <DocumentDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/receipt"
+            element={
+              <ProtectedRoute permission="inventory.manage">
+                <StockForm kind="receipt" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="issues"
+            element={
+              <ProtectedRoute permission="inventory.issue">
+                <StockForm kind="issue" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="directory"
+            element={
+              <ProtectedRoute permission="directory.manage">
+                <Directory />
+              </ProtectedRoute>
+            }
+          />
+          {modules
+            .filter(
+              (module) =>
+                ![
+                  '/',
+                  '/users',
+                  '/settings',
+                  '/inventory',
+                  '/issues',
+                  '/directory',
+                ].includes(module.path),
+            )
+            .map((module) => (
+              <Route
+                key={module.path}
+                path={module.path.slice(1)}
+                element={
+                  <ProtectedRoute permission={module.permission}>
+                    <Placeholder path={module.path} />
+                  </ProtectedRoute>
+                }
+              />
+            ))}
+          <Route
+            path="*"
+            element={
+              <EmptyState
+                title="Страница не найдена"
+                description="Проверьте адрес или выберите нужный раздел в меню."
+              >
+                <Button className="mt-5" asChild>
+                  <Link to="/">На главную</Link>
+                </Button>
+              </EmptyState>
+            }
+          />
+        </Route>
+      </Routes>
+    </WarehouseProvider>
   );
 }

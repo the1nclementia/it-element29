@@ -59,8 +59,6 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
         (
             "SELECT",
             [
-                "departments",
-                "employees",
                 "locations",
                 "roles",
                 "permissions",
@@ -68,9 +66,31 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
                 "alembic_version",
             ],
         ),
-        ("SELECT, INSERT, UPDATE", ["users"]),
+        (
+            "SELECT, INSERT, UPDATE",
+            [
+                "users",
+                "departments",
+                "employees",
+                "manufacturers",
+                "inventory_categories",
+                "printer_models",
+                "inventory_items",
+                "inventory_compatibilities",
+                "inventory_item_attachments",
+            ],
+        ),
         ("SELECT, INSERT, UPDATE, DELETE", ["sessions", "auth_rate_limits"]),
-        ("SELECT, INSERT", ["audit_logs"]),
+        (
+            "SELECT, INSERT",
+            [
+                "audit_logs",
+                "inventory_documents",
+                "inventory_document_items",
+                "inventory_movements",
+                "file_attachments",
+            ],
+        ),
     ]:
         execute(
             sql.SQL("GRANT {} ON {} TO {}").format(
@@ -79,3 +99,9 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
                 sql.Identifier(role),
             )
         )
+
+    execute(
+        sql.SQL("GRANT USAGE ON SEQUENCE inventory_document_number_seq TO {}").format(
+            sql.Identifier(role)
+        )
+    )

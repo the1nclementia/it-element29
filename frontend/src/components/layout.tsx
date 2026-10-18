@@ -115,6 +115,14 @@ export const modules: {
     description: 'Учётные записи и права доступа',
   },
   {
+    path: '/directory',
+    label: 'Справочники',
+    permission: 'directory.manage',
+    icon: ClipboardList,
+    group: 'Управление',
+    description: 'Подразделения и сотрудники-получатели',
+  },
+  {
     path: '/settings',
     label: 'Настройки',
     permission: 'settings.read',

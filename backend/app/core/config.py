@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     login_window_seconds: int = Field(default=900, ge=60, le=3600)
     app_db_user: str = "element29_app"
     app_db_password: SecretStr | None = None
+    uploads_dir: Path = Path("/app/uploads")
+    photo_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1, le=5 * 1024 * 1024)
+    photo_max_pixels: int = Field(default=20_000_000, ge=1, le=20_000_000)
+    photo_max_per_item: int = Field(default=5, ge=1, le=5)
 
     @field_validator("app_origins")
     @classmethod

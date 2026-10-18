@@ -1,0 +1,101 @@
+import re
+import uuid
+from typing import Annotated
+
+from pydantic import Field, StringConstraints, field_validator, model_validator
+
+from app.modules.identity.schemas import InputModel
+
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+Code = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
+
+
+class CatalogInput(InputModel):
+    @field_validator("*", mode="before")
+    @classmethod
+    def strip_strings(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def reject_nulls(self):
+        for name in self.model_fields_set:
+            if getattr(self, name) is None and name != "article":
+                raise ValueError("Поле не может быть пустым")
+        return self
+
+
+class VersionInput(CatalogInput):
+    version: int = Field(strict=True, ge=1)
+
+
+class ManufacturerCreate(CatalogInput):
+    name: Name
+
+
+class ManufacturerPatch(VersionInput):
+    name: Name | None = None
+
+
+class CategoryCreate(CatalogInput):
+    code: Code
+    name: Name
+
+    @field_validator("code")
+    @classmethod
+    def category_code(cls, value):
+        value = value.lower()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", value):
+            raise ValueError("Код категории: латинские буквы, цифры, дефис или подчёркивание")
+        return value
+
+
+class CategoryPatch(VersionInput):
+    name: Name | None = None
+
+
+class PrinterModelCreate(CatalogInput):
+    manufacturer_id: uuid.UUID
+    model: Name
+
+
+class PrinterModelPatch(VersionInput):
+    manufacturer_id: uuid.UUID | None = None
+    model: Name | None = None
+
+
+class ItemFields(CatalogInput):
+    category_id: uuid.UUID
+    manufacturer_id: uuid.UUID
+    model: Name
+    article: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
+    description: str = Field(default="", max_length=5000)
+    min_stock: int = Field(default=0, strict=True, ge=0, le=9_007_199_254_740_991)
+
+
+class ItemCreate(ItemFields):
+    internal_code: Code
+
+    @field_validator("internal_code")
+    @classmethod
+    def uppercase_code(cls, value):
+        return value.upper()
+
+
+class ItemPatch(VersionInput):
+    category_id: uuid.UUID | None = None
+    manufacturer_id: uuid.UUID | None = None
+    model: Name | None = None
+    article: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
+    description: str | None = Field(default=None, max_length=5000)
+    min_stock: int | None = Field(default=None, strict=True, ge=0, le=9_007_199_254_740_991)
+
+
+class CompatibilitiesInput(VersionInput):
+    printer_model_ids: list[uuid.UUID] = Field(max_length=100)
+
+    @field_validator("printer_model_ids")
+    @classmethod
+    def unique_models(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError("Модель принтера указана несколько раз")
+        return value

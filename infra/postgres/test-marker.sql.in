@@ -1,0 +1,2 @@
+CREATE TABLE public.test_cluster_marker (marker text PRIMARY KEY);
+INSERT INTO public.test_cluster_marker(marker) VALUES ('e29-stage3-isolated-tests-v1');

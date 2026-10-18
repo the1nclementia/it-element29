@@ -1,5 +1,5 @@
 # Dedicated disposable PostgreSQL. Never uses the main Compose volumes or .env credentials.
-name: element29-tests
+name: e29-stage3-tests
 services:
   postgres:
     image: postgres:17.11-alpine
@@ -10,6 +10,8 @@ services:
       POSTGRES_PASSWORD: disposable-test-only
       TZ: UTC
       PGTZ: UTC
+    volumes:
+      - ./infra/postgres/test-marker.sql.in:/docker-entrypoint-initdb.d/001-test-marker.sql:ro
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
@@ -24,11 +26,12 @@ services:
       target: test
     environment:
       RUN_DB_TESTS: "1"
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: element29_test
-      POSTGRES_USER: element29_test
-      POSTGRES_PASSWORD: disposable-test-only
+      TEST_CLUSTER_MARKER: e29-stage3-isolated-tests-v1
+      TEST_POSTGRES_HOST: postgres
+      TEST_POSTGRES_PORT: "5432"
+      TEST_POSTGRES_DB: element29_test
+      TEST_POSTGRES_USER: element29_test
+      TEST_POSTGRES_PASSWORD: disposable-test-only
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,3 +39,4 @@ services:
 networks:
   test:
     internal: true
+

@@ -40,7 +40,7 @@ test('вход, неверный пароль, refresh, cookie, пустой о�
   ).toBeVisible();
   await expect(
     page.getByText('Данные появятся после запуска модуля', { exact: true }),
-  ).toHaveCount(8);
+  ).toHaveCount(5);
   const cookie = (await context.cookies()).find(
     (item) => item.name === 'element29_session',
   );
@@ -247,7 +247,9 @@ test('мобильная навигация и отсутствие горизо
     .getByRole('link', { name: 'Склад', exact: true })
     .click();
   await expect(page.getByRole('dialog')).not.toBeVisible();
-  await expect(page.getByText('Раздел готовится к запуску')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Склад', exact: true }),
+  ).toBeVisible();
   await page.screenshot({
     path: '../.scratch/stage2-mobile.png',
     fullPage: true,

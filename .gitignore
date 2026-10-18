@@ -18,3 +18,9 @@ uploads/
 .scratch/
 .DS_Store
 Thumbs.db
+
+# Local frontend dependencies and caches
+frontend/.pnpm-store/
+
+# Temporary test backups
+*.py.bak

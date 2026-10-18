@@ -23,6 +23,7 @@ ALL_PERMISSIONS = READ_PERMISSIONS | {
     "movements.manage",
     "maintenance.manage",
     "users.manage",
+    "directory.manage",
 }
 ROLE_PERMISSIONS = {
     "administrator": ALL_PERMISSIONS,

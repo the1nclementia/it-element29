@@ -151,8 +151,14 @@ describe('Авторизация и интерфейс', () => {
     expect(requests.some((r) => r.path.includes('/users'))).toBe(false);
   });
   it('помечает будущий модуль как находящийся в разработке', async () => {
-    app('/inventory');
-    expect(await screen.findByRole('heading', { name: 'Склад' })).toBeVisible();
+    currentUser = {
+      ...user,
+      permissions: [...user.permissions, 'equipment.read'],
+    };
+    app('/equipment');
+    expect(
+      await screen.findByRole('heading', { name: 'Оборудование' }),
+    ).toBeVisible();
     expect(screen.getByText('В разработке')).toBeVisible();
     expect(
       screen.queryByRole('button', { name: /добавить|выдать|создать/i }),

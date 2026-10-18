@@ -10,8 +10,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import PROJECT_ROOT, Settings
 from app.db.session import build_engine
 from app.modules.dashboard.router import router as dashboard_router
+from app.modules.directory.router import router as directory_router
+from app.modules.files.middleware import PhotoBodyLimitMiddleware
+from app.modules.files.router import router as files_router
 from app.modules.health.router import router as health_router
 from app.modules.identity.router import router as identity_router
+from app.modules.inventory.stock_router import router as stock_router
+from app.modules.inventory.router import router as inventory_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -40,6 +45,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(identity_router, prefix="/api/v1")
     app.include_router(dashboard_router, prefix="/api/v1")
+    app.include_router(stock_router, prefix="/api/v1")
+    app.include_router(inventory_router, prefix="/api/v1")
+    app.include_router(directory_router, prefix="/api/v1")
+    app.include_router(files_router, prefix="/api/v1")
+    app.add_middleware(PhotoBodyLimitMiddleware, max_body_bytes=settings.photo_max_bytes + 65536)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
@@ -56,12 +66,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(SQLAlchemyError)
     async def database_error(request: Request, exc: SQLAlchemyError):
+        code = getattr(getattr(exc, "orig", None), "sqlstate", None)
+        busy = code in {"55P03", "57014", "40P01", "40001"}
         return JSONResponse(
             status_code=503,
             content={
                 "detail": {
-                    "code": "database_unavailable",
-                    "message": "Сервис временно недоступен. Повторите позже.",
+                    "code": "operation_busy" if busy else "database_unavailable",
+                    "message": (
+                        "Операция занята. Повторите запрос с тем же ключом."
+                        if busy
+                        else "Сервис временно недоступен. Повторите позже."
+                    ),
                 }
             },
         )

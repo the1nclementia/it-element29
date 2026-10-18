@@ -13,6 +13,7 @@ class Department(RecordMixin, Base):
         CheckConstraint("length(btrim(name)) > 0", name="name_not_blank"),
     )
 
+    version: Mapped[int] = mapped_column(default=1, server_default="1")
     code: Mapped[str] = mapped_column(String(50), unique=True)
     name: Mapped[str] = mapped_column(String(200))
 
@@ -24,6 +25,7 @@ class Employee(RecordMixin, Base):
         CheckConstraint("length(btrim(full_name)) > 0", name="name_not_blank"),
     )
 
+    version: Mapped[int] = mapped_column(default=1, server_default="1")
     personnel_number: Mapped[str] = mapped_column(String(50), unique=True)
     full_name: Mapped[str] = mapped_column(String(300))
     department_id: Mapped[uuid.UUID] = mapped_column(

@@ -1,19 +1,13 @@
-import os
 import secrets
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text, update
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings
 from app.db.session import build_engine
 from app.main import create_app
 
@@ -21,34 +15,6 @@ pytestmark = pytest.mark.integration
 PASSWORD = "Test-only-password-2026"
 NEW_PASSWORD = "Another-test-password-2026"
 ORIGIN = {"Origin": "http://testserver"}
-
-
-@pytest.fixture()
-def identity_db():
-    if os.environ.get("RUN_DB_TESTS") != "1":
-        pytest.skip("Requires a disposable PostgreSQL database and RUN_DB_TESTS=1")
-    settings = Settings(_env_file=None)
-    assert settings.postgres_db.endswith("_test"), "Disposable *_test database required"
-    settings = settings.model_copy(
-        update={
-            "app_origins": ["http://testserver"],
-            "cookie_secure": False,
-            "login_limit": 3,
-            "login_ip_limit": 30,
-        }
-    )
-    engine = build_engine(settings)
-    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
-    config.attributes["settings"] = settings
-    command.upgrade(config, "head")
-    # Only the dedicated *_test database. No directory rows or user database are touched.
-    with engine.begin() as connection:
-        if connection.execute(text("SELECT to_regclass('users')")).scalar():
-            connection.execute(
-                text("TRUNCATE audit_logs, sessions, auth_rate_limits, users CASCADE")
-            )
-    yield engine, settings
-    engine.dispose()
 
 
 @pytest.fixture()
@@ -238,7 +204,12 @@ def test_each_role_and_direct_admin_api(client, identity_db, role, allowed, deni
             )
         metrics = member.get("/api/v1/dashboard").json()["metrics"]
         assert len(metrics) == 8
-        assert all(metric["value"] is None and not metric["available"] for metric in metrics)
+        available = {"cartridge_balance", "issues_today", "low_stock"}
+        for metric in metrics:
+            if metric["key"] in available:
+                assert metric["value"] == 0 and metric["available"]
+            else:
+                assert metric["value"] is None and not metric["available"]
 
 
 def test_admin_edits_revoke_sessions_and_password_reset_is_temporary(client, identity_db):
@@ -415,8 +386,6 @@ def test_concurrent_admin_demotions_cannot_remove_all_administrators(client, ide
 
 
 def test_runtime_role_can_authenticate_but_cannot_modify_audit_or_schema(identity_db):
-    from psycopg import sql
-
     from app.db.provision import provision_runtime_role
 
     engine, settings = identity_db
@@ -437,24 +406,22 @@ def test_runtime_role_can_authenticate_but_cannot_modify_audit_or_schema(identit
             assert login(browser).status_code == 200
             assert browser.get("/api/v1/dashboard").status_code == 200
             add_user(browser)
-        for statement in [
-            "DELETE FROM audit_logs",
-            "UPDATE audit_logs SET action='tampered'",
-            "CREATE TABLE forbidden_test (id integer)",
-            "DELETE FROM users",
-        ]:
-            with pytest.raises(DBAPIError), limited.begin() as connection:
-                connection.execute(text(statement))
+        with limited.connect() as connection:
+            for table in ["audit_logs", "users", "inventory_documents", "inventory_movements"]:
+                assert not connection.scalar(
+                    text("SELECT has_table_privilege(current_user, :table, 'DELETE')"),
+                    {"table": table},
+                )
+            for table in ["audit_logs", "inventory_documents", "inventory_movements"]:
+                assert not connection.scalar(
+                    text("SELECT has_table_privilege(current_user, :table, 'UPDATE')"),
+                    {"table": table},
+                )
+            assert not connection.scalar(
+                text("SELECT has_schema_privilege(current_user, 'public', 'CREATE')")
+            )
     finally:
         limited.dispose()
-        with engine.begin() as connection:
-            driver = connection.connection.driver_connection
-            connection.exec_driver_sql(
-                sql.SQL("DROP OWNED BY {}").format(sql.Identifier(role)).as_string(driver)
-            )
-            connection.exec_driver_sql(
-                sql.SQL("DROP ROLE {}").format(sql.Identifier(role)).as_string(driver)
-            )
 
 
 def test_admin_request_waiting_for_lock_rechecks_revoked_session(client, identity_db):

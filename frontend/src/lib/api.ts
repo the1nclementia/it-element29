@@ -6,6 +6,15 @@ export class ApiError extends Error {
     public status: number,
     public code: string,
     message: string,
+    public detail?: {
+      code?: string;
+      message?: string;
+      items?: {
+        inventory_item_id: string;
+        available: number;
+        requested: number;
+      }[];
+    },
   ) {
     super(message);
   }
@@ -35,7 +44,9 @@ export async function request<T>(
   { body, anonymous = false, ...options }: Options = {},
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  if (body !== undefined) headers.set('Content-Type', 'application/json');
+  const multipart = body instanceof FormData;
+  if (multipart) headers.delete('Content-Type');
+  else if (body !== undefined) headers.set('Content-Type', 'application/json');
   if (options.method && !['GET', 'HEAD'].includes(options.method)) {
     if (!csrfToken) await refreshCsrf();
     headers.set('X-CSRF-Token', csrfToken!);
@@ -47,7 +58,9 @@ export async function request<T>(
       headers,
       credentials: 'same-origin',
       cache: 'no-store',
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      ...(body !== undefined
+        ? { body: multipart ? body : JSON.stringify(body) }
+        : {}),
     });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw error;
@@ -84,9 +97,17 @@ export async function request<T>(
       response.status === 429 && retryAfter && /^\d+$/.test(retryAfter)
         ? `${message} Повторите через ${retryAfter} сек.`
         : message,
+      detail,
     );
   }
-  return response.status === 204
-    ? (undefined as T)
-    : ((await response.json()) as T);
+  if (response.status === 204) return undefined as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new ApiError(
+      0,
+      'network',
+      'Ответ сервера не получен полностью. Повторите запрос.',
+    );
+  }
 }

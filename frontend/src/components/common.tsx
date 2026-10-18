@@ -23,11 +23,11 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-[28px]">
+      <div className="min-w-0">
+        <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-[28px]">
           {title}
         </h1>
-        <p className="mt-1.5 text-sm text-muted">{description}</p>
+        <p className="mt-1.5 break-words text-sm text-muted">{description}</p>
       </div>
       {children}
     </div>

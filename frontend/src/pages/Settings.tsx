@@ -168,7 +168,7 @@ export function Settings() {
             </p>
             <div className="mt-5 flex justify-between border-t border-border pt-4 text-xs">
               <span className="text-muted">Версия приложения</span>
-              <span className="font-medium">0.1.0 · Этап 2</span>
+              <span className="font-medium">0.1.0 · Этап 3</span>
             </div>
           </section>
         </div>

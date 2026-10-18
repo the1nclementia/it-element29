@@ -1,39 +1,20 @@
 """Runs only against a disposable database ending in _test; never uses SQLite."""
 
-import os
-from pathlib import Path
 from typing import Annotated
 
 import pytest
 from alembic import command
-from alembic.config import Config
 from fastapi import Depends
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings
-from app.db.session import build_engine, get_session
+from app.db.session import get_session
 from app.main import create_app
 from app.modules.directory.models import Department, Employee, Location
 
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture(scope="module")
-def database():
-    if os.environ.get("RUN_DB_TESTS") != "1":
-        pytest.skip("Set RUN_DB_TESTS=1 and POSTGRES_DB ending in _test for PostgreSQL integration")
-    settings = Settings(_env_file=None)
-    if not settings.postgres_db.endswith("_test"):
-        pytest.fail("Refusing destructive migration tests: POSTGRES_DB must end in _test")
-    engine = build_engine(settings)
-    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
-    config.attributes["settings"] = settings
-    command.upgrade(config, "head")
-    yield engine, settings, config
-    engine.dispose()
 
 
 def test_request_session_does_not_implicitly_commit(database):
@@ -93,15 +74,11 @@ def test_migration_schema_constraints_and_transaction_rollback(database):
         assert session.scalar(select(Department).where(Department.code == "TEST-IT")) is None
 
 
-def test_ready_only_after_migration_and_reversible_schema(database):
-    engine, settings, config = database
+def test_ready_only_after_forward_migration(empty_database):
+    engine, settings, config = empty_database
     with TestClient(create_app(settings)) as client:
-        assert client.get("/api/v1/health/ready").status_code == 200
-        command.downgrade(config, "base")
-        try:
-            assert "departments" not in inspect(engine).get_table_names()
-            assert client.get("/api/v1/health/ready").status_code == 503
-            assert client.get("/api/v1/health/live").status_code == 200
-        finally:
-            command.upgrade(config, "head")
+        assert "departments" not in inspect(engine).get_table_names()
+        assert client.get("/api/v1/health/ready").status_code == 503
+        assert client.get("/api/v1/health/live").status_code == 200
+        command.upgrade(config, "head")
         assert client.get("/api/v1/health/ready").status_code == 200

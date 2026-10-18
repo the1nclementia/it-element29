@@ -92,12 +92,12 @@ export function Dashboard() {
           <div>
             <p className="text-sm font-semibold">Рабочее пространство готово</p>
             <p className="mt-1 text-xs leading-5 text-muted">
-              Управляйте доступом и профилем. Учётные модули появятся на
-              следующем этапе.
+              Учитывайте поступления и выдачи, проверяйте складские остатки и
+              историю документов.
             </p>
           </div>
         </div>
-        <StatusBadge>Этап 2 · Авторизация и доступ</StatusBadge>
+        <StatusBadge>Этап 3 · Склад и выдача</StatusBadge>
       </div>
       <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-4">
         {query.data.metrics.map((metric) => (
