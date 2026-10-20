@@ -19,6 +19,7 @@ import { Inventory } from './pages/Inventory';
 import { ItemDetails } from './pages/ItemDetails';
 import { Documents, DocumentDetails } from './pages/Documents';
 import { Directory } from './pages/Directory';
+import { Drafts } from './pages/Drafts';
 import { StockForm } from './features/issues/StockForm';
 import { WarehouseProvider } from './features/issues/state';
 export function ProtectedRoute({
@@ -132,7 +133,7 @@ export function AppRoutes() {
             path="inventory/catalogs"
             element={
               <ProtectedRoute permission="inventory.read">
-                <Directory inventory />
+                <Directory key="inventory" inventory />
               </ProtectedRoute>
             }
           />
@@ -144,6 +145,7 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
+        <Route path="inventory/drafts" element={<ProtectedRoute permission="inventory.issue"><Drafts/></ProtectedRoute>}/>
           <Route
             path="inventory/documents/:id"
             element={
@@ -172,7 +174,7 @@ export function AppRoutes() {
             path="directory"
             element={
               <ProtectedRoute permission="directory.manage">
-                <Directory />
+                <Directory key="directory" />
               </ProtectedRoute>
             }
           />

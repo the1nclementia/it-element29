@@ -179,6 +179,8 @@ def conduct(
     session_hash: str,
     key: uuid.UUID,
     payload: ReceiptInput | IssueInput,
+    *,
+    commit: bool = True,
 ) -> tuple[dict, bool]:
     issue = isinstance(payload, IssueInput)
     kind = "issue" if issue else "receipt"
@@ -239,7 +241,8 @@ def conduct(
     audit(session, actor.id, f"inventory.{kind}", document.id)
     session.flush()
     result = document_response(session, document)
-    session.commit()
+    if commit:
+        session.commit()
     return result, True
 
 

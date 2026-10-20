@@ -17,6 +17,7 @@ import { CommandError } from '../inventory/shared';
 import { useOptions } from '../inventory/api';
 import type { Employee } from '../inventory/types';
 import { useCommand, useDraft } from './state';
+import type { ServerDraft } from './drafts';
 export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
   const client = useQueryClient();
   const basket = useDraft(kind);
@@ -25,23 +26,36 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
     kind,
     kind === 'issue' ? '/inventory/issues' : '/inventory/receipts',
   );
+  const saveCommand=useCommand<ServerDraft>(`save:${kind}`,'/inventory/drafts');
   const [confirm, setConfirm] = useState(false);
   const [validation, setValidation] = useState('');
   const employees = useOptions<Employee>('/directory/employees');
-  const locked = command.locked || command.pending;
+  const locked = basket.locked || command.pending || saveCommand.pending;
   const payload = () => ({
-    document_date: draft.date,
+    document_date: draft.date || null,
     comment: draft.comment,
     ...(kind === 'issue'
-      ? { recipient_employee_id: draft.employee }
+      ? { recipient_employee_id: draft.employee || null }
       : { receipt_purpose: draft.purpose, external_number: draft.external }),
     items: draft.lines.map((line) => ({
       inventory_item_id: line.item.id,
       quantity: line.quantity,
     })),
   });
+  async function save() {
+    if(draft.lines.some(line=>!Number.isInteger(line.quantity)||line.quantity<1||line.quantity>1000000)) {setValidation('Для сохранения укажите целое количество от 1 до 1 000 000.');return undefined;}
+    const result=await saveCommand.send(draft.saved?{version:draft.saved.version,payload:payload()}:{id:crypto.randomUUID(),document_type:kind,payload:payload()},draft.saved?`/inventory/drafts/${draft.saved.id}`:'/inventory/drafts',draft.saved?'PATCH':'POST');
+    if(result){basket.remember({id:result.id,version:result.version});await client.invalidateQueries({queryKey:['warehouse']});}
+    return result;
+  }
   async function send() {
-    const result = await command.send(payload());
+    let result;
+    if(command.locked) result=await command.send(payload());
+    else if(draft.saved){
+      const saved=await save();
+      if(!saved){setConfirm(false);return;}
+      result=await command.send({version:saved.version},`/inventory/drafts/${saved.id}/post`);
+    } else result = await command.send(payload());
     setConfirm(false);
     if (result) {
       basket.clear();
@@ -79,12 +93,15 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
             : 'Поставка или ввод начальных остатков одним документом'
         }
       >
-        <Button variant="outline" asChild>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" asChild><Link to="/inventory/drafts">Мои черновики</Link></Button><Button variant="outline" asChild>
           <Link to="/inventory">К каталогу</Link>
-        </Button>
+        </Button></div>
       </PageHeader>
       <div className="mb-5 space-y-3">
         <CommandError error={command.error} lines={draft.lines} />
+        <CommandError error={saveCommand.error} lines={draft.lines}/>
+        {draft.saved&&<Notice success>Черновик сохранён на сервере.</Notice>}
+        {saveCommand.locked&&!saveCommand.pending&&<Notice><div><p>Результат сохранения неизвестен. Повтор сохранит тот же черновик и содержимое.</p><Button className="mt-3" onClick={()=>void save()}>Повторить сохранение</Button></div></Notice>}
         {validation && <Notice>{validation}</Notice>}
         {command.locked && !command.pending && (
           <Notice>
@@ -265,13 +282,13 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
                 />
               )}
             </Field>
-            <Button type="submit" disabled={locked || !draft.lines.length}>
+            <div className="flex flex-wrap gap-3"><Button type="button" variant="outline" disabled={locked} onClick={()=>void save()}>Сохранить черновик</Button><Button type="submit" disabled={locked || !draft.lines.length}>
               {command.pending
                 ? 'Отправляем…'
                 : kind === 'issue'
                   ? 'Проверить выдачу'
                   : 'Проверить поступление'}
-            </Button>
+            </Button></div>
           </form>
         </section>
       </div>
@@ -282,7 +299,7 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
           kind === 'issue' ? 'Подтвердить выдачу' : 'Подтвердить поступление'
         }
         description="Все строки будут проведены одним документом. Проверьте количество и реквизиты."
-        pending={command.pending}
+        pending={command.pending||saveCommand.pending}
       >
         <div className="space-y-4">
           <p className="break-words text-sm">
@@ -303,7 +320,7 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
               </li>
             ))}
           </ul>
-          <Button disabled={command.pending} onClick={() => void send()}>
+          <Button disabled={command.pending||saveCommand.pending} onClick={() => void send()}>
             {kind === 'issue'
               ? 'Подтвердить выдачу'
               : 'Подтвердить поступление'}

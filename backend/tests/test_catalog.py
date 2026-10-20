@@ -456,3 +456,61 @@ def test_runtime_grants_for_stage3_are_minimal(catalog):
         assert not connection.scalar(
             text("SELECT has_schema_privilege(:role,'public','CREATE')"), {"role": role}
         )
+
+
+def test_category_names_are_unique_across_case_whitespace_edits_and_archive(catalog):
+    client, _ = catalog
+    first = create(client, "inventory/categories", {"code": "cables", "name": "USB Кабели"})
+    second = create(client, "inventory/categories", {"code": "keyboards", "name": "Клавиатуры"})
+    duplicate = client.post(
+        "/api/v1/inventory/categories",
+        headers=headers(client),
+        json={"code": "cables-copy", "name": "  usb   КАБЕЛИ  "},
+    )
+    assert duplicate.status_code == 409, duplicate.text
+    assert duplicate.json()["detail"]["code"] == "duplicate_record"
+    edited = client.patch(
+        "/api/v1/inventory/categories/" + second["id"],
+        headers=headers(client),
+        json={"version": 1, "name": "usb кабели"},
+    )
+    assert edited.status_code == 409, edited.text
+    same = client.patch(
+        "/api/v1/inventory/categories/" + first["id"],
+        headers=headers(client),
+        json={"version": 1, "name": "USB кабели"},
+    )
+    assert same.status_code == 200, same.text
+    archived = client.post(
+        "/api/v1/inventory/categories/" + first["id"] + "/archive",
+        headers=headers(client),
+        json={"version": 2},
+    )
+    assert archived.status_code == 200
+    duplicate = client.post(
+        "/api/v1/inventory/categories",
+        headers=headers(client),
+        json={"code": "cables-new", "name": "USB КАБЕЛИ"},
+    )
+    assert duplicate.status_code == 409, duplicate.text
+    assert client.get("/api/v1/inventory/categories", params={"q": "USB"}).json()["total"] == 0
+    assert client.get(
+        "/api/v1/inventory/categories", params={"q": "USB", "archived": "all"}
+    ).json()["total"] == 1
+
+
+def test_concurrent_category_names_cannot_create_duplicates(catalog):
+    client, _ = catalog
+    auth = headers(client)
+
+    def create_category(entry):
+        return client.post("/api/v1/inventory/categories", headers=auth, json=entry)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(create_category, [
+            {"code": "cables-a", "name": "USB Кабели"},
+            {"code": "cables-b", "name": "usb   КАБЕЛИ"},
+        ]))
+    assert sorted(result.status_code for result in results) == [201, 409], [
+        result.text for result in results
+    ]

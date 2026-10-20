@@ -68,18 +68,13 @@ def pack(source: Path, archive: Path) -> None:
 
 
 def restore(archive: Path, target: Path, *, set_owner: bool = True) -> None:
-    check(
-        archive
-    )  # All paths and compressed file data checked before removing anything.
+    check(archive)
     if target.is_symlink() or not target.is_dir():
         raise ValueError("Ожидался существующий uploads volume")
-    for path in target.iterdir():
-        if path.is_symlink() or path.is_file():
-            path.unlink()
-        elif path.is_dir():
-            shutil.rmtree(path)
-        else:
-            raise ValueError("Специальный файл в uploads")
+    if any(target.iterdir()):
+        raise ValueError(
+            "Восстановление допускается только в новый пустой uploads volume"
+        )
     with tarfile.open(archive, "r:gz") as stream:
         members = members_checked(stream)
         for member in sorted(

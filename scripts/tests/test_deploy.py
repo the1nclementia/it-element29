@@ -271,3 +271,203 @@ def test_file_backup_roundtrip_and_traversal_rejection(tmp_path):
     with pytest.raises(ValueError):
         files.restore(evil, dest, set_owner=False)
     assert (dest / "тест.txt").read_bytes() == b"file data"
+
+
+def test_file_restore_refuses_existing_files_without_modification(tmp_path):
+    files = importlib.import_module("file_archive")
+    source, target = tmp_path / "source", tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    (source / "new.txt").write_bytes(b"new")
+    (target / "existing.txt").write_bytes(b"preserve")
+    archive = tmp_path / "files.tar.gz"
+    files.pack(source, archive)
+    with pytest.raises(ValueError, match="пуст"):
+        files.restore(archive, target, set_owner=False)
+    assert (target / "existing.txt").read_bytes() == b"preserve"
+    assert not (target / "new.txt").exists()
+
+
+def backup_fixture(tmp_path, project="element29-production"):
+    import file_archive
+
+    mod = module()
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    files = tmp_path / "uploads"
+    files.mkdir()
+    (files / "photo.png").write_bytes(b"synthetic image")
+    file_archive.pack(files, backup / "files.tar.gz")
+    (backup / "database.dump").write_bytes(b"PGDMPsynthetic")
+    (backup / "backup.json").write_text(
+        json.dumps(
+            {
+                "format": 1,
+                "project": project,
+                "postgres_db": "source_db",
+                "release": manifest(),
+                "created_utc": "20261019T000000Z",
+                "recovery_only": False,
+            }
+        )
+    )
+    mod.write_checksums(backup, mod.BACKUP_FILES)
+    return backup
+
+
+def test_restore_new_rejects_existing_state_before_docker(tmp_path, monkeypatch):
+    obj, root, calls = runner(tmp_path, monkeypatch)
+    obj.mark_current(root)
+    backup = backup_fixture(tmp_path)
+    with pytest.raises(ValueError):
+        obj.restore_new(root, backup, "RESTORE-NEW element29-staging 0.1.0-stage2")
+    assert calls == []
+
+
+def test_restore_new_rejects_source_project_and_wrong_confirmation(
+    tmp_path, monkeypatch
+):
+    obj, root, calls = runner(tmp_path, monkeypatch)
+    backup = backup_fixture(tmp_path, project=obj.project)
+    for confirmation in ["wrong", "RESTORE-NEW element29-staging 0.1.0-stage2"]:
+        with pytest.raises(ValueError):
+            obj.restore_new(root, backup, confirmation)
+    assert calls == []
+
+
+def test_restore_new_uses_empty_database_and_keeps_source_untouched(
+    tmp_path, monkeypatch
+):
+    obj, root, calls = runner(tmp_path, monkeypatch)
+    backup = backup_fixture(tmp_path)
+    original_execute = module().execute
+
+    def execute(args, **kwargs):
+        result = original_execute(args, **kwargs)
+        if any("pg_namespace" in arg for arg in args):
+            return "0\n"
+        return result
+
+    monkeypatch.setattr(module(), "execute", execute)
+    original_dump = (backup / "database.dump").read_bytes()
+    obj.restore_new(root, backup, "RESTORE-NEW element29-staging 0.1.0-stage2")
+    commands = [" ".join(command) for command in calls]
+    restore_index = next(
+        i
+        for i, command in enumerate(commands)
+        if "pg_restore --exit-on-error" in command
+    )
+    provision_index = next(
+        i for i, command in enumerate(commands) if "provision-db-role" in command
+    )
+    start_index = next(
+        i
+        for i, command in enumerate(commands)
+        if " up " in command and "backend" in command
+    )
+    assert restore_index < provision_index < start_index
+    assert not any(
+        "dropdb" in command or "--clean" in command or " volume rm " in command
+        for command in commands
+    )
+    assert not any("upgrade" in command for command in commands)
+    assert (backup / "database.dump").read_bytes() == original_dump
+    assert obj.current() == root
+    assert not (obj.state / "pending.json").exists()
+    assert (obj.state / "restored-from.json").is_file()
+
+
+def test_restore_new_refuses_nonempty_database_before_restore(tmp_path, monkeypatch):
+    obj, root, calls = runner(tmp_path, monkeypatch)
+    backup = backup_fixture(tmp_path)
+    original_execute = module().execute
+
+    def execute(args, **kwargs):
+        result = original_execute(args, **kwargs)
+        if any("pg_namespace" in arg for arg in args):
+            return "1\n"
+        return result
+
+    monkeypatch.setattr(module(), "execute", execute)
+    with pytest.raises(ValueError, match="пуст"):
+        obj.restore_new(root, backup, "RESTORE-NEW element29-staging 0.1.0-stage2")
+    assert (obj.state / "pending.json").exists()
+    assert not any(
+        "pg_restore --exit-on-error" in " ".join(command) for command in calls
+    )
+    assert not any("backend" in command and "up" in command for command in calls)
+
+
+@pytest.mark.parametrize("resource", ["volume", "container"])
+def test_restore_new_refuses_existing_target_resources(tmp_path, monkeypatch, resource):
+    obj, root, calls = runner(tmp_path, monkeypatch)
+    backup = backup_fixture(tmp_path)
+    original_execute = module().execute
+
+    def execute(args, **kwargs):
+        result = original_execute(args, **kwargs)
+        if resource == "volume" and args[:3] == ["docker", "volume", "ls"]:
+            return "element29-staging-files\n"
+        if resource == "container" and args[:2] == ["docker", "ps"]:
+            return "synthetic-container\n"
+        return result
+
+    monkeypatch.setattr(module(), "execute", execute)
+    with pytest.raises(ValueError):
+        obj.restore_new(root, backup, "RESTORE-NEW element29-staging 0.1.0-stage2")
+    assert not any(command[:3] == ["docker", "volume", "create"] for command in calls)
+    assert not any("up" in command for command in calls)
+
+
+@pytest.mark.parametrize("defect", ["checksum", "release", "recovery_only"])
+def test_restore_new_rejects_invalid_backup_before_docker(
+    tmp_path, monkeypatch, defect
+):
+    obj, root, calls = runner(tmp_path, monkeypatch)
+    backup = backup_fixture(tmp_path)
+    if defect == "checksum":
+        (backup / "database.dump").write_bytes(b"tampered")
+    else:
+        metadata = json.loads((backup / "backup.json").read_text())
+        if defect == "release":
+            metadata["release"]["git_commit"] = "b" * 40
+        else:
+            metadata["recovery_only"] = True
+        (backup / "backup.json").write_text(json.dumps(metadata))
+        module().write_checksums(backup, module().BACKUP_FILES)
+    with pytest.raises(ValueError):
+        obj.restore_new(root, backup, "RESTORE-NEW element29-staging 0.1.0-stage2")
+    assert calls == []
+
+
+@pytest.mark.parametrize("step", ["dump_check", "database_restore", "files_restore"])
+def test_restore_new_failure_keeps_pending_and_never_starts_app(
+    tmp_path, monkeypatch, step
+):
+    obj, root, calls = runner(tmp_path, monkeypatch)
+    backup = backup_fixture(tmp_path)
+    original_execute = module().execute
+
+    def execute(args, **kwargs):
+        result = original_execute(args, **kwargs)
+        if any("pg_namespace" in arg for arg in args):
+            return "0\n"
+        fail = (
+            step == "dump_check"
+            and "--file=/dev/null" in args
+            or step == "database_restore"
+            and any("pg_restore --exit-on-error" in arg for arg in args)
+            or step == "files_restore"
+            and "restore" in args
+        )
+        if fail:
+            raise RuntimeError("synthetic restore failure")
+        return result
+
+    monkeypatch.setattr(module(), "execute", execute)
+    with pytest.raises(RuntimeError):
+        obj.restore_new(root, backup, "RESTORE-NEW element29-staging 0.1.0-stage2")
+    assert (obj.state / "pending.json").exists()
+    assert not (obj.state / "current.json").exists()
+    assert (backup / "database.dump").read_bytes() == b"PGDMPsynthetic"
+    assert not any("up" in command and "backend" in command for command in calls)

@@ -134,11 +134,11 @@ export const modules: {
 export function Brand({ compact = false }: { compact?: boolean }) {
   return compact ? (
     <span className="brand-mark">
-      <img src="/brand/mark-original.png" alt="ИТ-элемент [29]" />
+      <img src="/brand/mark-transparent.png" alt="ИТ-элемент [29]" />
     </span>
   ) : (
     <span className="brand-window">
-      <img src="/brand/wordmark-original.png" alt="ИТ-элемент [29]" />
+      <img src="/brand/wordmark-transparent.png" alt="ИТ-элемент [29]" />
     </span>
   );
 }

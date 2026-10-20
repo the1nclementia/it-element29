@@ -78,6 +78,7 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
                 "inventory_items",
                 "inventory_compatibilities",
                 "inventory_item_attachments",
+                "inventory_drafts",
             ],
         ),
         ("SELECT, INSERT, UPDATE, DELETE", ["sessions", "auth_rate_limits"]),

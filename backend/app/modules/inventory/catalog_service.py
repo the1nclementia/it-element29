@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -136,6 +136,11 @@ def list_references(
 def save_reference(session: Session, actor, session_hash, model, payload, record_id=None):
     values = payload.model_dump(exclude_unset=True)
     version = values.pop("version", None)
+    if model is InventoryCategory and "name" in values:
+        # Existing category schema has no normalized name column. Serialize API
+        # creates/renames before row/auth locks; preserve already stored categories.
+        session.execute(text("SELECT pg_advisory_xact_lock(:namespace, :resource)"),
+                        {"namespace": 29, "resource": 3})
     if model is PrinterModel:
         previous = session.get(model, record_id) if record_id else None
         if record_id and previous is None:
@@ -160,6 +165,13 @@ def save_reference(session: Session, actor, session_hash, model, payload, record
         if record.archived_at is not None:
             fail(409, "record_archived", "Сначала восстановите запись из архива.")
     revalidate_mutation(session, actor, session_hash, "inventory.manage")
+    if model is InventoryCategory and "name" in values:
+        name_key = normalize_key(values["name"])
+        names = session.execute(select(InventoryCategory.id, InventoryCategory.name))
+        if any(existing_id != record_id and normalize_key(name) == name_key
+               for existing_id, name in names):
+            fail(409, "duplicate_record",
+                 "Категория с таким названием уже существует, в том числе в архиве.")
     if model is Manufacturer and "name" in values:
         values["name_key"] = normalize_key(values["name"])
     if model is PrinterModel and "model" in values:
@@ -203,7 +215,7 @@ def archive_reference(session: Session, actor, session_hash, model, record_id, v
     return reference_response(session, record)
 
 
-def list_items(
+def item_query(
     session: Session,
     *,
     q="",
@@ -215,8 +227,6 @@ def list_items(
     archived="false",
     sort="code",
     direction="asc",
-    offset=0,
-    limit=20,
 ):
     ledger = balance_query()
     amount = func.coalesce(ledger.c.balance, 0)
@@ -257,14 +267,17 @@ def list_items(
     if low_stock is not None:
         low = (InventoryItem.min_stock > 0) & (amount < InventoryItem.min_stock)
         statement = statement.where(low if low_stock else ~low)
-    total = session.scalar(select(func.count()).select_from(statement.subquery()))
     order = {"code": InventoryItem.internal_code, "model": InventoryItem.model, "balance": amount}[
         sort
     ]
+    return statement.order_by(order.desc() if direction == "desc" else order.asc(), InventoryItem.id)
+
+
+def list_items(session: Session, *, offset=0, limit=20, **filters):
+    statement = item_query(session, **filters)
+    total = session.scalar(select(func.count()).select_from(statement.order_by(None).subquery()))
     rows = session.execute(
-        statement.order_by(order.desc() if direction == "desc" else order.asc(), InventoryItem.id)
-        .offset(offset)
-        .limit(limit)
+        statement.offset(offset).limit(limit)
     )
     return {
         "items": [item_response(session, item, int(amount)) for item, amount in rows],

@@ -507,47 +507,93 @@ class Deployment:
         return data
 
     def restore(self, root: Path, backup: Path, confirmation: str):
-        # Pure validation and typed confirmation precede even Docker image load/stop.
+        raise ValueError(
+            "Восстановление поверх существующих данных запрещено. "
+            "Используйте restore-new в новом пустом контуре."
+        )
+
+    def restore_new(self, root: Path, backup: Path, confirmation: str):
+        # Validate trusted backup/release data before touching any target resource.
         manifest = verify_release(root)
-        expected = f"RESTORE {self.project} {manifest['version']}"
+        expected = f"RESTORE-NEW {self.project} {manifest['version']}"
         if confirmation != expected:
             raise ValueError("Введённая фраза не совпадает; восстановление отменено")
         verify_files(backup, BACKUP_FILES)
         data = read_json(backup / "backup.json")
-        if data.get("release") != manifest or data.get("recovery_only"):
+        if (
+            data.get("format") != 1
+            or data.get("release") != manifest
+            or data.get("recovery_only") is not False
+        ):
             raise ValueError(
                 "Требуется точный исходный выпуск backup; аварийный снимок требует ручной диагностики"
             )
         if (
-            data.get("project") != self.project
-            or data.get("postgres_db") != self.config["POSTGRES_DB"]
+            not isinstance(data.get("project"), str)
+            or data["project"] == self.project
+            or not isinstance(data.get("postgres_db"), str)
         ):
-            raise ValueError("Backup не соответствует контуру/БД")
+            raise ValueError(
+                "Для восстановления необходим новый контур, отличный от источника"
+            )
         check_files(backup / "files.tar.gz")
-        current = self.current()
+        if (backup / "database.dump").stat().st_size < 5:
+            raise ValueError("Пустой dump")
+        if any(path.name != "deploy.lock" for path in self.state.iterdir()):
+            raise ValueError("Для восстановления нужен новый пустой каталог state")
+        containers = execute(
+            [
+                "docker",
+                "ps",
+                "-aq",
+                "--filter",
+                "label=com.docker.compose.project=" + self.project,
+            ],
+            env=self.base_env(),
+        ).strip()
+        volumes = execute(
+            ["docker", "volume", "ls", "--format", "{{.Name}}"], env=self.base_env()
+        ).splitlines()
+        names = [self.project + "-postgres", self.project + "-files"]
+        if containers or any(name in volumes for name in names):
+            raise ValueError(
+                "Целевые контейнеры или volumes уже существуют; данные не изменены"
+            )
         self.prepare(root)
-        self.verify_backup(current, backup)
-        self.announce("остановка записи перед явным восстановлением")
-        self.compose(
-            current, "stop", "proxy", "backend", "runtime-ops", "owner-ops", "file-ops"
-        )
-        self.backup(current)  # Preserve current data before destructive restoration.
+        self.last_backup = backup
         self.pending(root)
-        self.announce("явное восстановление базы и файлов")
-        # Use the currently running compatible PostgreSQL 17 patch, not a binary downgrade.
-        self.compose(
-            current,
+        self.announce("создание нового контура и проверка пустой базы")
+        for name in names:
+            execute(["docker", "volume", "create", name], env=self.base_env())
+        self.compose(root, "up", "-d", "--wait", "--wait-timeout", "180", "postgres")
+        count = self.compose(
+            root,
             "exec",
             "-T",
             "postgres",
             "sh",
             "-ec",
-            'dropdb --force --if-exists -U "$POSTGRES_USER" -- "$POSTGRES_DB"; '
-            'createdb -U "$POSTGRES_USER" -O "$POSTGRES_USER" -- "$POSTGRES_DB"',
-        )
+            'exec psql -X -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" '
+            '-c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace '
+            "WHERE n.nspname NOT IN ('pg_catalog','information_schema') "
+            "AND n.nspname NOT LIKE 'pg_toast%'" + '"',
+        ).strip()
+        if count != "0":
+            raise ValueError("Целевая база не пуста; восстановление остановлено")
         with (backup / "database.dump").open("rb") as source:
             self.compose(
-                current,
+                root,
+                "exec",
+                "-T",
+                "postgres",
+                "pg_restore",
+                "--file=/dev/null",
+                stdin=source,
+            )
+        self.announce("восстановление в новые пустые базу и files volume")
+        with (backup / "database.dump").open("rb") as source:
+            self.compose(
+                root,
                 "exec",
                 "-T",
                 "postgres",
@@ -581,6 +627,16 @@ class Deployment:
             "app.cli",
             "provision-db-role",
         )
+        self.atomic_json(
+            self.state / "restored-from.json",
+            {
+                "backup": str(backup),
+                "backup_sha256": digest(backup / "backup.json"),
+                "source_project": data["project"],
+                "source_database": data["postgres_db"],
+                "target_project": self.project,
+            },
+        )
         self.start(root)
 
 
@@ -588,7 +644,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Офлайн deploy ИТ-элемент [29]")
     parser.add_argument(
         "action",
-        choices=["install", "update", "backup", "restore", "health", "create-admin"],
+        choices=[
+            "install",
+            "update",
+            "backup",
+            "restore",
+            "restore-new",
+            "health",
+            "create-admin",
+        ],
     )
     parser.add_argument(
         "--environment", required=True, choices=["production", "staging"]
@@ -620,22 +684,27 @@ def main() -> int:
             operation = Deployment(args.environment, args.config, state)
             operation.preflight()
             root = args.release.resolve() if args.release else None
-            if args.action in {"install", "update", "restore"} and root is None:
+            if (
+                args.action in {"install", "update", "restore", "restore-new"}
+                and root is None
+            ):
                 raise ValueError("Обязателен --release")
             if args.action == "install":
                 operation.install(root)
             elif args.action == "update":
                 operation.update(root)
             elif args.action == "restore":
+                operation.restore(root, args.backup, "")
+            elif args.action == "restore-new":
                 if args.backup is None or not sys.stdin.isatty():
                     raise ValueError(
                         "Нужны --backup и интерактивный терминал для подтверждения"
                     )
                 version = verify_release(root)["version"]
                 phrase = input(
-                    f"Будут заменены база и файлы. Введите RESTORE {operation.project} {version}: "
+                    f"Будет создан новый контур. Введите RESTORE-NEW {operation.project} {version}: "
                 )
-                operation.restore(root, args.backup.resolve(), phrase)
+                operation.restore_new(root, args.backup.resolve(), phrase)
             elif args.action == "health":
                 operation.health(operation.current())
             elif args.action == "create-admin":

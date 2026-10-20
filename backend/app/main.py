@@ -15,8 +15,10 @@ from app.modules.files.middleware import PhotoBodyLimitMiddleware
 from app.modules.files.router import router as files_router
 from app.modules.health.router import router as health_router
 from app.modules.identity.router import router as identity_router
-from app.modules.inventory.stock_router import router as stock_router
+from app.modules.inventory.draft_router import router as draft_router
+from app.modules.inventory.export_router import router as export_router
 from app.modules.inventory.router import router as inventory_router
+from app.modules.inventory.stock_router import router as stock_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -47,6 +49,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(stock_router, prefix="/api/v1")
     app.include_router(inventory_router, prefix="/api/v1")
+    app.include_router(export_router, prefix="/api/v1")
+    app.include_router(draft_router, prefix="/api/v1")
     app.include_router(directory_router, prefix="/api/v1")
     app.include_router(files_router, prefix="/api/v1")
     app.add_middleware(PhotoBodyLimitMiddleware, max_body_bytes=settings.photo_max_bytes + 65536)

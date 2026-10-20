@@ -29,7 +29,9 @@ from release_lib import DEPLOY_FILES, RELEASE_FILES, verify_release, write_check
 
 import deploy
 
-project = "e29-release-test"
+run_id = secrets.token_hex(5)
+project = "e29-release-test-" + run_id
+restore_project = "e29-restore-test-" + run_id
 existing_containers = deploy.execute(
     ["docker", "ps", "-aq", "--filter", "label=com.docker.compose.project=" + project]
 ).strip()
@@ -41,7 +43,7 @@ if existing_containers or any(
 ):
     raise RuntimeError("Тестовый контур уже существует; сначала проверьте его вручную")
 
-base = repo / (".scratch/release-live-" + secrets.token_hex(3))
+base = repo / (".scratch/release-live-" + run_id)
 base.mkdir(exist_ok=False)
 tls = base / "tls"
 tls.mkdir()
@@ -89,6 +91,13 @@ config.write_text(
     ),
     encoding="utf-8",
 )
+restore_config = base / "restore.env"
+restore_config.write_text(
+    config.read_text(encoding="utf-8")
+    .replace("release_test", "restore_test")
+    .replace("19443", "19444"),
+    encoding="utf-8",
+)
 
 
 class WindowsRehearsal(deploy.Deployment):
@@ -134,6 +143,7 @@ class WindowsRehearsal(deploy.Deployment):
         )
 
     def health(self, root):
+        port = self.config["HTTPS_PORT"]
         deploy.execute(
             [
                 "curl.exe",
@@ -145,8 +155,8 @@ class WindowsRehearsal(deploy.Deployment):
                 "--cacert",
                 str(tls / "fullchain.pem"),
                 "--resolve",
-                "localhost:19443:127.0.0.1",
-                "https://localhost:19443/api/v1/health/ready",
+                f"localhost:{port}:127.0.0.1",
+                f"https://localhost:{port}/api/v1/health/ready",
             ]
         )
 
@@ -163,7 +173,7 @@ for service, source in [
     ("postgres", "postgres:17.11-alpine"),
     ("proxy", "nginx:1.30.6-alpine"),
 ]:
-    ref = "element29/" + service + ":0.1.0-rehearsal"
+    ref = "element29/" + service + ":0.1.0-rehearsal-" + run_id
     docker("tag", source, ref)
     info = json.loads(docker("image", "inspect", ref))[0]
     original = (
@@ -211,8 +221,109 @@ state = base / "state"
 state.mkdir()
 obj = WindowsRehearsal("staging", config, state)
 obj.project = project
+restore_state = base / "restore-state"
+restore_state.mkdir()
+restored = WindowsRehearsal("staging", restore_config, restore_state)
+restored.project = restore_project
+
+seed_code = """
+import secrets, uuid
+from datetime import UTC, datetime, timedelta, date
+from io import BytesIO
+from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from app.core.config import Settings
+from app.db.session import build_engine
+from app.modules.directory import models as directory_models
+from app.modules.files.service import add_photo
+from app.modules.identity.models import User, AuthSession
+from app.modules.identity.service import bootstrap_admin
+from app.modules.inventory.models import Manufacturer, InventoryCategory, InventoryItem
+from app.modules.inventory.stock_schemas import ReceiptInput
+from app.modules.inventory.stock_service import conduct
+from app.modules.inventory.draft_schemas import DraftCreate
+from app.modules.inventory.draft_service import create as create_draft
+settings = Settings()
+engine = build_engine(settings)
+with Session(engine) as session:
+    user_id = bootstrap_admin(session, 'rehearsal', 'Synthetic operator', secrets.token_urlsafe(32) + 'aA1!').id
+    actor = session.get(User, user_id)
+    manufacturer = Manufacturer(name='Synthetic manufacturer', name_key='synthetic manufacturer')
+    session.add(manufacturer)
+    session.flush()
+    category = session.scalar(select(InventoryCategory).where(InventoryCategory.code == 'cartridges'))
+    item = InventoryItem(internal_code='REHEARSAL-1', model='Synthetic model', category_id=category.id, manufacturer_id=manufacturer.id)
+    session.add(item)
+    token = secrets.token_hex(32)
+    session.add(AuthSession(token_hash=token, user_id=user_id, expires_at=datetime.now(UTC)+timedelta(hours=2)))
+    session.commit()
+    conduct(session, actor, token, uuid.uuid4(), ReceiptInput(document_date=date.today(), receipt_purpose='opening_balance', items=[{'inventory_item_id': item.id, 'quantity': 10}]))
+    output = BytesIO()
+    Image.new('RGB', (12, 7), 'blue').save(output, format='PNG')
+    add_photo(session, settings, actor, token, item.id, output.getvalue(), 'image/png')
+    create_draft(session, actor, token, DraftCreate(document_type='receipt', payload={'items': [{'inventory_item_id': str(item.id), 'quantity': 3}]}))
+engine.dispose()
+"""
+
+snapshot_code = """
+import hashlib, json
+from sqlalchemy import MetaData, select
+from sqlalchemy.orm import Session
+from app.core.config import Settings
+from app.db.session import build_engine
+from app.modules.directory import models as directory_models
+from app.modules.identity import models as identity_models
+from app.modules.inventory import models as inventory_models
+from app.modules.files import models as file_models
+settings = Settings()
+engine = build_engine(settings)
+snapshot = {}
+metadata = MetaData()
+# The owner-only marker is checked separately; all application tables are read
+# through the restricted runtime role, including the Alembic revision.
+metadata.reflect(bind=engine, only=lambda name, _: name != 'rehearsal_marker')
+with Session(engine) as session:
+    for table in metadata.sorted_tables:
+        rows = sorted(json.dumps(dict(row), sort_keys=True, default=str) for row in session.execute(select(table)).mappings())
+        snapshot[table.name] = {'rows': len(rows), 'sha256': hashlib.sha256(json.dumps(rows).encode()).hexdigest()}
+    for file in session.scalars(select(file_models.FileAttachment)):
+        data = (settings.uploads_dir / file.storage_key).read_bytes()
+        assert hashlib.sha256(data).hexdigest() == file.sha256
+        assert len(data) == file.size
+        snapshot['file:' + str(file.id)] = file.sha256
+engine.dispose()
+print(json.dumps(snapshot, sort_keys=True))
+"""
+
+
+def snapshot(operation, release):
+    return json.loads(
+        operation.compose(
+            release,
+            "run",
+            "--rm",
+            "--no-deps",
+            "runtime-ops",
+            "python",
+            "-c",
+            snapshot_code,
+        )
+    )
+
+
 try:
     obj.install(old)
+    obj.compose(
+        old, "run", "--rm", "--no-deps", "runtime-ops", "python", "-c", seed_code
+    )
+    before = snapshot(obj, old)
+    assert before["inventory_documents"]["rows"] == 1
+    assert before["inventory_movements"]["rows"] == 1
+    assert before["file_attachments"]["rows"] == 1
+    assert before["inventory_drafts"]["rows"] == 1
+    obj.compose(old, "up", "-d", "--no-deps", "--force-recreate", "--wait", "backend")
+    assert snapshot(obj, old) == before
     obj.compose(
         old,
         "exec",
@@ -265,9 +376,35 @@ try:
         "-c",
         "from pathlib import Path; Path('/app/uploads/check.txt').write_text('after')",
     )
-    obj.restore(old, saved, "RESTORE e29-release-test 0.1.0-rehearsal")
-    value = obj.compose(
+    restored.restore_new(old, saved, f"RESTORE-NEW {restore_project} 0.1.0-rehearsal")
+    assert snapshot(restored, old) == before
+    value = restored.compose(
         old,
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "release_owner",
+        "-d",
+        "restore_test",
+        "-At",
+        "-c",
+        "SELECT value FROM rehearsal_marker",
+    ).strip()
+    file_value = restored.compose(
+        old,
+        "run",
+        "--rm",
+        "--no-deps",
+        "file-ops",
+        "python",
+        "-c",
+        "from pathlib import Path; print(Path('/app/uploads/check.txt').read_text())",
+    ).strip()
+    assert value == file_value == "before", (value, file_value)
+    source_value = obj.compose(
+        new,
         "exec",
         "-T",
         "postgres",
@@ -280,24 +417,27 @@ try:
         "-c",
         "SELECT value FROM rehearsal_marker",
     ).strip()
-    file_value = obj.compose(
-        old,
-        "run",
-        "--rm",
-        "--no-deps",
-        "file-ops",
-        "python",
-        "-c",
-        "from pathlib import Path; print(Path('/app/uploads/check.txt').read_text())",
-    ).strip()
-    assert value == file_value == "before", (value, file_value)
-    assert obj.current() == old
-    assert not (state / "pending.json").exists()
+    assert source_value == "after"
+    assert obj.current() == new and restored.current() == old
+    assert not (restore_state / "pending.json").exists()
+    (base / "verification.json").write_text(
+        json.dumps(
+            {
+                "source_project": project,
+                "target_project": restore_project,
+                "snapshot": before,
+                "backup": str(saved),
+                "source_preserved": True,
+                "photo_survived_recreate": True,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(
-        "PASS: real Docker install -> update + verified DB/files backup -> explicit restore -> HTTPS readiness; DB/files restored."
+        "PASS: install, photo recreate, update/backup, restore-new, runtime data/file hashes and HTTPS readiness. Source unchanged."
     )
 finally:
-    obj.compose(old, "down", "--remove-orphans")
-    for name in ["e29-release-test-postgres", "e29-release-test-files"]:
-        if name in docker("volume", "ls", "--format", "{{.Name}}").splitlines():
-            docker("volume", "rm", name)
+    print(
+        f"Сохранены контейнеры/volumes {project} и {restore_project}; артефакты: {base}"
+    )

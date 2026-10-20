@@ -167,3 +167,21 @@ it('ИТ-специалист не может открыть поступлен�
     expect(screen.getByText('Недостаточно прав')).toBeVisible(),
   );
 });
+it('сохраняет неполный личный черновик без получателя и проведения', async () => {
+  app('/issues'); const events=userEvent.setup();
+  await events.click(await screen.findByRole('button',{name:'Добавить в корзину TEST-1'}));
+  const previous=vi.mocked(fetch).getMockImplementation()!;
+  let draftBody:Record<string,unknown>|undefined;
+  vi.mocked(fetch).mockImplementation(async(url,options)=>{
+    if(String(url).endsWith('/inventory/drafts')&&options?.method==='POST'){
+      draftBody=JSON.parse(String(options.body));
+      return Response.json({id:draftBody!.id,version:1,document_type:'issue',payload:draftBody!.payload,status:'draft'});
+    }
+    return previous(url,options);
+  });
+  await events.click(screen.getByRole('button',{name:'Сохранить черновик'}));
+  await screen.findByText('Черновик сохранён на сервере.');
+  expect(draftBody).toMatchObject({document_type:'issue',payload:{recipient_employee_id:null,items:[{inventory_item_id:'item1',quantity:1}]}});
+  expect(sent).toHaveLength(0);
+  expect(screen.getByLabelText('Количество TEST-1')).toHaveValue(1);
+});

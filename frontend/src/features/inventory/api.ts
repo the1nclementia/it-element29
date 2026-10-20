@@ -15,15 +15,15 @@ export function useList<T>(
   });
 }
 // Selectors fetch every page; the server still limits each request to 100 records.
-export function useOptions<T>(path: string) {
+export function useOptions<T>(path: string, q = '') {
   return useQuery({
-    queryKey: ['warehouse', 'options', path],
+    queryKey: ['warehouse', 'options', path, q],
     queryFn: async ({ signal }) => {
       const items: T[] = [];
       let total = 0;
       do {
         const page = await request<Page<T>>(
-          `${path}?limit=100&offset=${items.length}`,
+          `${path}?limit=100&offset=${items.length}${q ? `&q=${encodeURIComponent(q)}` : ''}`,
           { signal },
         );
         total = page.total;
