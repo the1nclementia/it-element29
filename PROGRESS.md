@@ -1,6 +1,6 @@
 # Состояние проекта
 
-Дата текущей работы: 2026-10-21 (Asia/Yekaterinburg).
+Дата текущей работы: 2026-10-22 (Asia/Yekaterinburg).
 
 ## Этап 3 — локальная приёмка пройдена
 
@@ -65,8 +65,34 @@
 хеши всех таблиц и фотографии; исходный контур сохранён. Фото пережило пересоздание
 контейнеров. Оба контура healthy, volumes не удалялись. Локальный артефакт проверки:
 `.scratch/release-live-f37e595b66/verification.json`. Это Linux-контейнеры на Windows,
-а не проверка Ubuntu/systemd/SSH/DNS предприятия. Формальный автономный архив
-собирается отдельно из чистого локального коммита.
+а не проверка Ubuntu/systemd/SSH/DNS предприятия.
+
+### Автономный выпуск
+
+Windows-скрипт `scripts/release/build-release.ps1` успешно собрал **0.3.0-rc1**
+для **linux/amd64** из чистого commit `bb31bc8a75190f46aa1792b890704b46e3cc6c71`.
+Использованы параметры `-Version 0.3.0-rc1 -Platform linux/amd64`,
+`-OutputDirectory .scratch/offline-stage3-bb31bc8`, Python из `.venv`,
+PostgreSQL `17.11-alpine` и Nginx `1.30.6-alpine` с проверенными digest из manifest.
+Собраны backend/frontend, экспортированы четыре образа, Compose, deploy-скрипты,
+документация, manifest и SHA256SUMS. Исходники вне образов, `.env`, локальные БД и
+пользовательские файлы не включены в пакет.
+
+Архив:
+`.scratch/offline-stage3-bb31bc8/element29-0.3.0-rc1-bb31bc8a7519-linux-amd64.tar.gz`.
+SHA256: `64707239ba86626ccf5c4fc8b68e16d63d8f84d85af9689f74778a1d23a0c9ea`.
+
+Дополнительно успешно выполнен штатный `scripts/deploy/unpack-release.py`
+с этим архивом, новым target `.scratch/offline-stage3-bb31bc8-unpacked` и
+`--sha256 64707239ba86626ccf5c4fc8b68e16d63d8f84d85af9689f74778a1d23a0c9ea`.
+Проверены внешний hash, allowlist, manifest и внутренние контрольные суммы.
+Репетиция install/update/restore описана выше отдельно; на корпоративном сервере
+этот архив не запускался. Последующий commit отчёта не меняет содержимое выпуска.
+
+Оставшиеся границы: Ubuntu host preflight, root/права каталогов, flock, systemd,
+корпоративные SSH/DNS/CA/firewall и ARM64 требуют отдельной проверки. Восстановление
+допускается только в новый пустой контур. Основной локальный стенд автоматически
+не обновлялся; безопасная ручная последовательность с backup приведена в README.
 
 ## Исторические результаты этапов 1–2 (18.10.2026)
 
