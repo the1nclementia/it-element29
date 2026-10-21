@@ -4,12 +4,14 @@ import type { Page } from './types';
 export function useList<T>(
   path: string,
   parameters: Record<string, string | number | boolean | undefined> = {},
+  enabled = true,
 ) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(parameters))
     if (value !== undefined && value !== '') query.set(key, String(value));
   const url = `${path}?${query}`;
   return useQuery({
+    enabled,
     queryKey: ['warehouse', url],
     queryFn: ({ signal }) => request<Page<T>>(url, { signal }),
   });

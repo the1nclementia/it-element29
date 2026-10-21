@@ -109,7 +109,10 @@ def create(session: Session, actor: User, session_hash: str, payload: DraftCreat
     if previous:
         if previous.owner_id != actor.id:
             fail(404, "draft_not_found", "Черновик не найден.")
-        if previous.document_type != payload.document_type or previous.payload != values:
+        if (
+            previous.document_type != payload.document_type
+            or normalize_payload(previous.document_type, previous.payload) != values
+        ):
             fail(
                 409,
                 "idempotency_conflict",
@@ -143,7 +146,10 @@ def update(
     revalidate_mutation(session, actor, session_hash, DRAFT_PERMISSIONS[draft.document_type])
     require_editable(draft)
     values = normalize_payload(draft.document_type, payload.payload)
-    if draft.version == payload.version + 1 and draft.payload == values:
+    if (
+        draft.version == payload.version + 1
+        and normalize_payload(draft.document_type, draft.payload) == values
+    ):
         # The previous save committed but its response was lost; preserve its version.
         return response(draft)
     check_version(draft, payload.version)

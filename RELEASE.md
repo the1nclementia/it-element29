@@ -1,6 +1,6 @@
 # Автономный выпуск с Windows
 
-Комплект переносит этапы 1–3 на Ubuntu 24.04: справочники, складские документы, отмены, фотографии и личные черновики. В образ backend входят forward-миграции `0003_inventory` и `0004_inventory_drafts`; этапы 4–8 не включены. Корпоративные базы, пользовательские файлы и секреты остаются внутри корпоративной сети. Для сборки нужны Windows, PowerShell 7, Git, Python 3.12+ и Docker Desktop в режиме Linux containers с Buildx. Сервер не собирает приложение и не обращается к registry.
+Комплект переносит этапы 1–3 на Ubuntu 24.04: справочники, складские документы, отмены, фотографии и личные черновики. В образ backend входят forward-миграции `0003_inventory`, `0004_inventory_drafts` и `0005_inventory_document_details` с реквизитами поступления и кабинетом получателя; этапы 4–8 не включены. Корпоративные базы, пользовательские файлы и секреты остаются внутри корпоративной сети. Для сборки нужны Windows, PowerShell 7, Git, Python 3.12+ и Docker Desktop в режиме Linux containers с Buildx. Сервер не собирает приложение и не обращается к registry.
 
 ## 1. Подготовить проверенный commit
 
@@ -68,8 +68,8 @@ scp .\scripts\deploy\unpack-release.py .\scripts\deploy\release_lib.py deploy@se
 ```powershell
 .\.venv\Scripts\python.exe -m pytest scripts/tests -q -p no:cacheprovider --basetemp=.scratch/release-tests
 .\.venv\Scripts\python.exe scripts/tests/rehearse_docker.py --run `
-  --backend-image element29/backend:0.1.0-acceptance `
-  --frontend-image element29/frontend:0.1.0-acceptance
+  --backend-image element29/backend:0.3.0-acceptance `
+  --frontend-image element29/frontend:0.3.0-acceptance
 ```
 
 Образы acceptance должны быть предварительно собраны из проверяемых исходников; локально также нужны `postgres:17.11-alpine` и `nginx:1.30.6-alpine`. Harness создаёт уникальные проекты `e29-release-test-<id>` и `e29-restore-test-<id>` с новыми volumes и публикует временный HTTPS только на `127.0.0.1:19443` и `127.0.0.1:19444`. Порты должны быть свободны. Он сохраняет/загружает образы, проверяет install/update, синтетический складской документ и фотографию, сохранение фото после recreate backend, целостность dump и архива, восстановление в новый контур и HTTPS readiness с тестовым CA. Снимки всех таблиц приложения и хеши фотографий сверяются через runtime-роль; отдельные маркеры подтверждают сохранность источника. `--run` явно разрешает синтетическую репетицию; интерактивное подтверждение production CLI проверяется отдельно. Контейнеры и volumes после репетиции сохраняются; исходная база не заменяется. Артефакты и успешный отчёт `verification.json` находятся в игнорируемом `.scratch/release-live-*`. При неуспехе отчёт не создаётся. В manifest репетиции указан тестовый snapshot; это не официальный выпуск из чистого commit.

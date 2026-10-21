@@ -8,7 +8,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { useId, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
 import { ApiError } from '../lib/api';
@@ -111,7 +111,7 @@ export function StatusBadge({
           ? 'bg-emerald-50 text-emerald-700'
           : active === false
             ? 'bg-slate-100 text-slate-600'
-            : 'bg-blue-50 text-blue-700',
+            : 'bg-primary-light text-primary-hover',
       )}
     >
       <span
@@ -121,7 +121,7 @@ export function StatusBadge({
             ? 'bg-emerald-500'
             : active === false
               ? 'bg-slate-400'
-              : 'bg-blue-500',
+              : 'bg-primary',
         )}
       />
       {children ?? (active ? 'Активен' : 'Заблокирован')}
@@ -178,6 +178,9 @@ export function ConfirmDialog({
   description,
   children,
   pending = false,
+  className,
+  bodyClassName,
+  onCloseAutoFocus,
 }: {
   open: boolean;
   onClose: () => void;
@@ -185,7 +188,11 @@ export function ConfirmDialog({
   description: string;
   children: ReactNode;
   pending?: boolean;
+  className?: string;
+  bodyClassName?: string;
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
+  const returnFocus = useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root
       open={open}
@@ -196,13 +203,29 @@ export function ConfirmDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[2px]" />
         <Dialog.Content
+          onOpenAutoFocus={() => {
+            returnFocus.current =
+              document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            onCloseAutoFocus?.(event);
+            if (!event.defaultPrevented && returnFocus.current?.isConnected) {
+              event.preventDefault();
+              returnFocus.current.focus();
+            }
+          }}
           onEscapeKeyDown={(event) => {
             if (pending) event.preventDefault();
           }}
           onPointerDownOutside={(event) => {
             if (pending) event.preventDefault();
           }}
-          className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-white p-6 shadow-2xl"
+          className={cn(
+            'fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-white p-6 shadow-2xl',
+            className,
+          )}
         >
           <Dialog.Title className="pr-8 text-xl font-semibold">
             {title}
@@ -221,7 +244,7 @@ export function ConfirmDialog({
               <X />
             </Button>
           </Dialog.Close>
-          <div className="mt-5">{children}</div>
+          <div className={cn('mt-5', bodyClassName)}>{children}</div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

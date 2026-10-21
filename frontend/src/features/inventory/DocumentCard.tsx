@@ -6,7 +6,14 @@ export function DocumentCard({ document }: { document: InventoryDocument }) {
   return (
     <section className="space-y-4 rounded-xl border border-border bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold"><Link className="text-primary hover:underline" to={`/inventory/documents/${document.id}`}>{document.number}</Link></h2>
+        <h2 className="text-lg font-semibold">
+          <Link
+            className="text-primary hover:underline"
+            to={`/inventory/documents/${document.id}`}
+          >
+            {document.number}
+          </Link>
+        </h2>
         <StatusBadge active={!document.is_cancelled}>
           {document.is_cancelled
             ? 'Отменён'
@@ -29,6 +36,18 @@ export function DocumentCard({ document }: { document: InventoryDocument }) {
               {document.recipient_name} · {document.recipient_personnel_number}{' '}
               · {document.recipient_department}
             </dd>
+          </div>
+        )}
+        {document.supplier_name && (
+          <div>
+            <dt className="text-muted">Поставщик</dt>
+            <dd className="break-words">{document.supplier_name}</dd>
+          </div>
+        )}
+        {document.recipient_room && (
+          <div>
+            <dt className="text-muted">Кабинет</dt>
+            <dd className="break-words">{document.recipient_room}</dd>
           </div>
         )}
         {document.receipt_purpose && (

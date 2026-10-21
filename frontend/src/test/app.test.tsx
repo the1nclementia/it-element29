@@ -5,6 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from '../App';
 import { AuthProvider } from '../auth';
+import type {
+  InventoryDocument,
+  InventoryItem,
+} from '../features/inventory/types';
 
 const user = {
   id: '1',
@@ -19,9 +23,15 @@ const user = {
 };
 let currentUser: typeof user | null;
 let requests: { path: string; options?: RequestInit }[];
+let dashboardDocuments: InventoryDocument[];
+let dashboardItems: InventoryItem[];
+let documentFailure: boolean;
 beforeEach(() => {
   currentUser = { ...user };
   requests = [];
+  dashboardDocuments = [];
+  dashboardItems = [];
+  documentFailure = false;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string, options?: RequestInit) => {
@@ -60,6 +70,24 @@ beforeEach(() => {
         return Response.json({
           metrics: [
             {
+              key: 'cartridge_balance',
+              label: 'Картриджей на складе',
+              value: null,
+              available: true,
+            },
+            {
+              key: 'issues_today',
+              label: 'Выдач сегодня',
+              value: 2,
+              available: true,
+            },
+            {
+              key: 'low_stock',
+              label: 'Низкий остаток',
+              value: 1,
+              available: true,
+            },
+            {
               key: 'equipment_total',
               label: 'Всего оборудования',
               value: null,
@@ -67,6 +95,26 @@ beforeEach(() => {
             },
           ],
           recent_events: [],
+        });
+      if (path.includes('/inventory/documents'))
+        return documentFailure
+          ? Response.json(
+              {
+                detail: {
+                  code: 'unavailable',
+                  message: 'Документы временно недоступны',
+                },
+              },
+              { status: 503 },
+            )
+          : Response.json({
+              items: dashboardDocuments,
+              total: dashboardDocuments.length,
+            });
+      if (path.includes('/inventory/items?'))
+        return Response.json({
+          items: dashboardItems,
+          total: dashboardItems.length,
         });
       if (path.includes('/users') && options?.method)
         return options.method === 'POST' && path.endsWith('reset-password')
@@ -134,14 +182,156 @@ describe('Авторизация и интерфейс', () => {
   it('восстанавливает сессию и показывает null как отсутствие данных, не ноль', async () => {
     app();
     expect(
-      await screen.findByRole('heading', { name: 'Обзор системы' }),
+      await screen.findByRole('heading', { name: 'Добро пожаловать!' }),
     ).toBeVisible();
-    expect(await screen.findByText('Всего оборудования')).toBeVisible();
+    expect(await screen.findByText('Картриджей на складе')).toBeVisible();
+    expect(screen.queryByText('Всего оборудования')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Значение недоступно')).toHaveTextContent('—');
     expect(
       screen.queryByRole('link', { name: 'Пользователи' }),
     ).not.toBeInTheDocument();
     expect(requests.some((r) => r.path.endsWith('/auth/csrf'))).toBe(true);
+  });
+  it('показывает только доступные складские действия и реальные пустые состояния', async () => {
+    app();
+    expect(
+      await screen.findByRole('link', { name: /Открыть склад/ }),
+    ).toHaveAttribute('href', '/inventory');
+    expect(
+      screen.queryByRole('link', { name: /Добавить номенклатуру/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /Новое поступление/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /Оформить выдачу/ }),
+    ).not.toBeInTheDocument();
+    expect(await screen.findByText('Документов пока нет')).toBeVisible();
+    expect(await screen.findByText('Все остатки в норме')).toBeVisible();
+  });
+  it('даёт разрешённые быстрые действия по рабочим адресам', async () => {
+    currentUser = {
+      ...user,
+      permissions: [...user.permissions, 'inventory.manage', 'inventory.issue'],
+    };
+    app();
+    expect(
+      await screen.findByRole('link', { name: /Добавить номенклатуру/ }),
+    ).toHaveAttribute('href', '/inventory?create=1');
+    expect(
+      screen.getByRole('link', { name: /Новое поступление/ }),
+    ).toHaveAttribute('href', '/inventory/receipt');
+    expect(
+      screen.getByRole('link', { name: /Оформить выдачу/ }),
+    ).toHaveAttribute('href', '/issues');
+  });
+  it('показывает полученные документы и остатки со ссылками на карточки', async () => {
+    dashboardDocuments = [
+      {
+        id: 'doc-1',
+        number: 'INV-00042',
+        document_type: 'receipt',
+        document_date: '2026-10-20',
+        created_at: '2026-10-20T09:00:00Z',
+        created_by_id: '1',
+        created_by_name: user.display_name,
+        recipient_employee_id: null,
+        recipient_name: null,
+        recipient_personnel_number: null,
+        recipient_department: null,
+        recipient_room: null,
+        supplier_name: null,
+        comment: null,
+        receipt_purpose: 'purchase',
+        external_number: null,
+        reversal_of_id: null,
+        reason: null,
+        is_cancelled: true,
+        reversal_id: 'reversal-1',
+        reversal_number: 'INV-00043',
+        items: [],
+      },
+    ];
+    dashboardItems = [
+      {
+        id: 'item-1',
+        version: 1,
+        archived_at: null,
+        created_at: '2026-10-20T09:00:00Z',
+        updated_at: '2026-10-20T09:00:00Z',
+        internal_code: 'TEST-042',
+        category_id: 'cat-1',
+        category_name: 'Картриджи',
+        manufacturer_id: 'maker-1',
+        manufacturer_name: 'Тест',
+        model: 'Картридж 42',
+        article: null,
+        description: '',
+        min_stock: 3,
+        balance: 1,
+        unit: 'pcs',
+        is_low_stock: true,
+        primary_photo_url: null,
+      },
+    ];
+    app();
+    const document = await screen.findByRole('link', { name: /INV-00042/ });
+    expect(document).toHaveAttribute('href', '/inventory/documents/doc-1');
+    expect(document).toHaveTextContent('Отменён');
+    const item = await screen.findByRole('link', { name: /Тест Картридж 42/ });
+    expect(item).toHaveAttribute('href', '/inventory/items/item-1');
+    expect(item).toHaveTextContent('Минимум 3 шт.');
+    expect(item).toHaveTextContent('1 шт.');
+    expect(screen.getByRole('link', { name: /Показать все/ })).toHaveAttribute(
+      'href',
+      '/inventory?low_stock=true',
+    );
+  });
+  it('изолирует ошибку документов и повторяет загрузку по кнопке', async () => {
+    documentFailure = true;
+    app();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Документы временно недоступны',
+    );
+    expect(screen.getByText('Все остатки в норме')).toBeVisible();
+    expect(screen.queryByText('Документов пока нет')).not.toBeInTheDocument();
+    documentFailure = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    expect(await screen.findByText('Документов пока нет')).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+  it('не запрашивает и не показывает складские списки без inventory.read', async () => {
+    currentUser = { ...user, permissions: ['dashboard.read', 'settings.read'] };
+    app();
+    await screen.findByRole('heading', { name: 'Добро пожаловать!' });
+    expect(
+      screen.queryByRole('heading', { name: 'Последние документы' }),
+    ).not.toBeInTheDocument();
+    expect(requests.some(({ path }) => path.includes('/inventory/'))).toBe(
+      false,
+    );
+  });
+  it('открывает историю и отчёты для чтения склада, черновики — для управления', async () => {
+    currentUser = {
+      ...user,
+      permissions: [...user.permissions, 'inventory.manage'],
+    };
+    app();
+    const navigation = within(await screen.findByRole('navigation'));
+    expect(navigation.getByRole('link', { name: 'История' })).toHaveAttribute(
+      'href',
+      '/history',
+    );
+    expect(navigation.getByRole('link', { name: 'Отчёты' })).toHaveAttribute(
+      'href',
+      '/reports',
+    );
+    expect(
+      navigation.getByRole('link', { name: 'Мои черновики' }),
+    ).toHaveAttribute('href', '/inventory/drafts');
+    expect(
+      navigation.getByRole('link', { name: 'Поступления' }),
+    ).toHaveAttribute('href', '/inventory/receipt');
   });
   it('закрывает прямой маршрут пользователей для роли без users.manage', async () => {
     app('/users');
@@ -166,7 +356,7 @@ describe('Авторизация и интерфейс', () => {
   });
   it('истечение сессии на API очищает загруженные данные и открывает вход', async () => {
     const client = app();
-    await screen.findByRole('heading', { name: 'Обзор системы' });
+    await screen.findByRole('heading', { name: 'Добро пожаловать!' });
     vi.mocked(fetch).mockResolvedValueOnce(
       Response.json(
         { detail: { code: 'unauthorized', message: 'Войдите в систему' } },
@@ -221,7 +411,7 @@ describe('Авторизация и интерфейс', () => {
   });
   it('выход очищает данные и возвращает форму входа', async () => {
     const client = app();
-    await screen.findByRole('heading', { name: 'Обзор системы' });
+    await screen.findByRole('heading', { name: 'Добро пожаловать!' });
     await userEvent.click(screen.getByRole('button', { name: 'Выйти' }));
     await screen.findByRole('button', { name: 'Войти в систему' });
     expect(client.getQueryData(['dashboard'])).toBeUndefined();

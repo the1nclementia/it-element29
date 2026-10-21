@@ -20,6 +20,8 @@ export interface Draft {
   comment: string;
   purpose: string;
   external: string;
+  supplier: string;
+  room: string;
   saved?: { id: string; version: number };
 }
 interface Attempt {
@@ -49,6 +51,8 @@ const emptyDraft = (): Draft => ({
   comment: '',
   purpose: 'delivery',
   external: '',
+  supplier: '',
+  room: '',
 });
 interface WarehouseState {
   drafts: Record<string, Draft>;
@@ -63,12 +67,17 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     receipt: emptyDraft(),
   });
   const [commands, setCommands] = useState<Record<string, CommandState>>({});
-  const unsettled = Object.values(commands).some(command => !!command.attempt);
+  const unsettled = Object.values(commands).some(
+    (command) => !!command.attempt,
+  );
   useEffect(() => {
     if (!unsettled) return;
-    const protectAttempt = (event: BeforeUnloadEvent) => {event.preventDefault();event.returnValue='';};
-    window.addEventListener('beforeunload',protectAttempt);
-    return () => window.removeEventListener('beforeunload',protectAttempt);
+    const protectAttempt = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protectAttempt);
+    return () => window.removeEventListener('beforeunload', protectAttempt);
   }, [unsettled]);
   return (
     <State.Provider value={{ drafts, setDrafts, commands, setCommands }}>
@@ -83,7 +92,8 @@ function useWarehouse() {
 }
 export function useDraft(kind: 'issue' | 'receipt') {
   const { drafts, setDrafts, commands } = useWarehouse();
-  const locked = !!commands[kind]?.attempt || !!commands[`save:${kind}`]?.attempt;
+  const locked =
+    !!commands[kind]?.attempt || !!commands[`save:${kind}`]?.attempt;
   const update = (change: Partial<Draft>) => {
     if (!locked)
       setDrafts((previous) => ({
@@ -109,8 +119,14 @@ export function useDraft(kind: 'issue' | 'receipt') {
   };
   const clear = () =>
     setDrafts((previous) => ({ ...previous, [kind]: emptyDraft() }));
-  const remember = (saved: {id:string;version:number}) => setDrafts(previous=>({...previous,[kind]:{...previous[kind],saved}}));
-  const load = (draft:Draft) => {if(!locked)setDrafts(previous=>({...previous,[kind]:draft}));};
+  const remember = (saved: { id: string; version: number }) =>
+    setDrafts((previous) => ({
+      ...previous,
+      [kind]: { ...previous[kind], saved },
+    }));
+  const load = (draft: Draft) => {
+    if (!locked) setDrafts((previous) => ({ ...previous, [kind]: draft }));
+  };
   return { draft: drafts[kind], update, add, clear, locked, remember, load };
 }
 export function useCommand<T = InventoryDocument>(slot: string, path: string) {
@@ -128,12 +144,15 @@ export function useCommand<T = InventoryDocument>(slot: string, path: string) {
     };
     update({ attempt, pending: true });
     try {
-      const response = await request<T | {document:T}>(attempt.path, {
+      const response = await request<T | { document: T }>(attempt.path, {
         method: attempt.method,
         body: attempt.payload,
         headers: { 'Idempotency-Key': attempt.key },
       });
-      const result = response && typeof response === 'object' && 'document' in response ? response.document : response as T;
+      const result =
+        response && typeof response === 'object' && 'document' in response
+          ? response.document
+          : (response as T);
       update({ pending: false, result });
       return result;
     } catch (error) {
@@ -150,6 +169,14 @@ export function useCommand<T = InventoryDocument>(slot: string, path: string) {
       return undefined;
     }
   }
-  const reset = () => {if(!state.attempt)update({pending:false});};
-  return { ...state, result:state.result as T | undefined, send, reset, locked: !!state.attempt };
+  const reset = () => {
+    if (!state.attempt) update({ pending: false });
+  };
+  return {
+    ...state,
+    result: state.result as T | undefined,
+    send,
+    reset,
+    locked: !!state.attempt,
+  };
 }

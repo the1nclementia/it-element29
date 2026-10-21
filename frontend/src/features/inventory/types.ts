@@ -92,6 +92,8 @@ export interface InventoryDocument {
   comment: string | null;
   receipt_purpose: string | null;
   external_number: string | null;
+  supplier_name: string | null;
+  recipient_room: string | null;
   reversal_of_id: string | null;
   reason: string | null;
   is_cancelled: boolean;

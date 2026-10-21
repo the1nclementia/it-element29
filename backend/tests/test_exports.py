@@ -102,3 +102,37 @@ def test_movement_export_snapshots_filters_and_permissions(stock):
     with TestClient(create_app(settings)) as anonymous:
         assert anonymous.get("/api/v1/inventory/exports/balances.xlsx").status_code == 401
         assert anonymous.get("/api/v1/inventory/exports/movements.xlsx").status_code == 401
+
+
+def test_movement_export_filters_document_type_and_recipient(stock):
+    browser, _, _, ids = stock
+    receive(stock)
+    issued = post(browser, "issues", [(ids["items"][0], 3)], employee=ids["employee"])
+    assert issued.status_code == 201
+    assert (
+        browser.post(
+            f"/api/v1/inventory/documents/{issued.json()['id']}/cancel",
+            headers=headers(browser),
+            json={"reason": "Проверка фильтров отчёта"},
+        ).status_code
+        == 201
+    )
+    url = "/api/v1/inventory/exports/movements.xlsx"
+    receipts = sheet(browser.get(url, params={"document_type": "receipt"}))
+    assert len(receipts) == 3
+    assert all(row[1] == "Поступление" for row in receipts[1:])
+    issues = sheet(
+        browser.get(
+            url,
+            params={
+                "document_type": "issue",
+                "recipient_employee_id": ids["employee"],
+            },
+        )
+    )
+    assert len(issues) == 2
+    assert issues[1][0] == issued.json()["number"] and issues[1][7] == -3
+    recipient_movements = sheet(browser.get(url, params={"recipient_employee_id": ids["employee"]}))
+    assert [row[1] for row in recipient_movements[1:]] == ["Выдача", "Отмена"]
+    assert len(sheet(browser.get(url, params={"recipient_employee_id": str(uuid.uuid4())}))) == 1
+    assert browser.get(url, params={"document_type": "unknown"}).status_code == 422

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader, Notice } from '../components/common';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../auth';
@@ -9,7 +9,8 @@ import { useDraft } from '../features/issues/state';
 export function Inventory() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [create, setCreate] = useState(false);
+  const [parameters, setParameters] = useSearchParams();
+  const [create, setCreate] = useState(parameters.get('create') === '1');
   const [added, setAdded] = useState('');
   const basket = useDraft('issue');
   const manage = user?.permissions.includes('inventory.manage');
@@ -63,9 +64,13 @@ export function Inventory() {
             : undefined
         }
       />
-      {create && (
+      {create && manage && (
         <ItemForm
-          onClose={() => setCreate(false)}
+          onClose={() => {
+            setCreate(false);
+            parameters.delete('create');
+            setParameters(parameters, { replace: true });
+          }}
           onSaved={(item) => navigate(`/inventory/items/${item.id}`)}
         />
       )}

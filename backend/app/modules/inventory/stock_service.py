@@ -31,6 +31,10 @@ MAX_BALANCE = 9_007_199_254_740_991
 
 def request_hash(payload: dict) -> str:
     normalized = dict(payload)
+    # New optional metadata must not invalidate idempotency keys issued before 0005.
+    for field in ("supplier_name", "recipient_room"):
+        if normalized.get(field) is None:
+            normalized.pop(field, None)
     if "items" in normalized:
         normalized["items"] = sorted(normalized["items"], key=lambda row: row["inventory_item_id"])
     return hashlib.sha256(
@@ -198,6 +202,7 @@ def conduct(
             "recipient_name": employee.full_name,
             "recipient_personnel_number": employee.personnel_number,
             "recipient_department": department.name,
+            "recipient_room": payload.recipient_room,
         }
     items = lock_items(session, [line.inventory_item_id for line in payload.items])
     revalidate_mutation(session, actor, session_hash, permission)
@@ -217,6 +222,7 @@ def conduct(
         request_hash=fingerprint,
         receipt_purpose=None if issue else payload.receipt_purpose,
         external_number=None if issue else payload.external_number,
+        supplier_name=None if issue else payload.supplier_name,
         **recipient,
     )
     for index, line in enumerate(payload.items, 1):
@@ -292,6 +298,8 @@ def cancel(
         recipient_name=original.recipient_name,
         recipient_personnel_number=original.recipient_personnel_number,
         recipient_department=original.recipient_department,
+        recipient_room=original.recipient_room,
+        supplier_name=original.supplier_name,
     )
     for line, movement in lines:
         item = items[line.inventory_item_id]

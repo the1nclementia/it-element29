@@ -36,11 +36,18 @@ test('вход, неверный пароль, refresh, cookie, пустой о�
   ).toBeVisible();
   await login(page);
   await expect(
-    page.getByRole('heading', { name: 'Обзор системы', exact: true }),
+    page.getByRole('heading', { name: 'Добро пожаловать!', exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText('Данные появятся после запуска модуля', { exact: true }),
-  ).toHaveCount(5);
+  ).toHaveCount(0);
+  for (const label of [
+    'Остаток картриджей',
+    'Выдачи за сегодня',
+    'Низкие остатки',
+  ]) {
+    await expect(page.getByText(label, { exact: true })).toBeVisible();
+  }
   const cookie = (await context.cookies()).find(
     (item) => item.name === 'element29_session',
   );
@@ -54,7 +61,7 @@ test('вход, неверный пароль, refresh, cookie, пустой о�
   ).toEqual([0, 0]);
   await page.reload();
   await expect(
-    page.getByRole('heading', { name: 'Обзор системы', exact: true }),
+    page.getByRole('heading', { name: 'Добро пожаловать!', exact: true }),
   ).toBeVisible();
   await page.goto('/equipment');
   await expect(page.getByText('Раздел готовится к запуску')).toBeVisible();
@@ -128,7 +135,10 @@ test('управление пользователем, обязательная 
     expect((await member.request.get('/api/v1/auth/me')).status()).toBe(401);
     await login(memberPage, username, changed);
     await expect(
-      memberPage.getByRole('heading', { name: 'Обзор системы', exact: true }),
+      memberPage.getByRole('heading', {
+        name: 'Добро пожаловать!',
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(
       memberPage.getByRole('link', { name: 'Выдача', exact: true }),
@@ -182,7 +192,7 @@ for (const role of [
   }) => {
     await login(page);
     await expect(
-      page.getByRole('heading', { name: 'Обзор системы', exact: true }),
+      page.getByRole('heading', { name: 'Добро пожаловать!', exact: true }),
     ).toBeVisible();
     const username = `role_${randomBytes(5).toString('hex')}`;
     const password = temporary();
@@ -211,7 +221,10 @@ for (const role of [
       ).toBe(200);
       await memberPage.goto('/');
       await expect(
-        memberPage.getByRole('heading', { name: 'Обзор системы', exact: true }),
+        memberPage.getByRole('heading', {
+          name: 'Добро пожаловать!',
+          exact: true,
+        }),
       ).toBeVisible();
       await expect(
         memberPage.getByRole('link', { name: 'Пользователи', exact: true }),
@@ -234,7 +247,7 @@ test('мобильная навигация и отсутствие горизо
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
   await expect(
-    page.getByRole('heading', { name: 'Обзор системы', exact: true }),
+    page.getByRole('heading', { name: 'Добро пожаловать!', exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -260,7 +273,7 @@ test('визуальный контроль desktop', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await login(page);
   await expect(
-    page.getByRole('heading', { name: 'Обзор системы', exact: true }),
+    page.getByRole('heading', { name: 'Добро пожаловать!', exact: true }),
   ).toBeVisible();
   await page.screenshot({
     path: '../.scratch/stage2-desktop.png',

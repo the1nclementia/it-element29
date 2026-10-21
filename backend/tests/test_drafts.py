@@ -280,10 +280,15 @@ def test_issue_draft_stock_failure_preserves_draft_then_concurrent_post_is_once(
     department = create_reference(
         browser, "directory/departments", {"code": "DRAFT", "name": "Тестовый отдел"}
     )
-    employee = create_reference(browser, "directory/employees", {
-        "personnel_number": "DRAFT-01", "full_name": "Вымышленный получатель",
-        "department_id": department["id"],
-    })
+    employee = create_reference(
+        browser,
+        "directory/employees",
+        {
+            "personnel_number": "DRAFT-01",
+            "full_name": "Вымышленный получатель",
+            "department_id": department["id"],
+        },
+    )
     issue = create_draft(browser, item, "issue", recipient_employee_id=employee["id"])
     path = "/api/v1/inventory/drafts/" + issue["id"]
     auth = headers(browser)
@@ -298,7 +303,8 @@ def test_issue_draft_stock_failure_preserves_draft_then_concurrent_post_is_once(
     receipt = create_draft(browser, item)
     received = browser.post(
         "/api/v1/inventory/drafts/" + receipt["id"] + "/post",
-        headers=auth, json={"version": 1},
+        headers=auth,
+        json={"version": 1},
     )
     assert received.status_code == 201, received.text
 
@@ -352,8 +358,10 @@ def test_draft_mutations_require_csrf_and_replay_requires_current_permission(dra
     assert posted.status_code == 201
     actor_id = browser.get("/api/v1/auth/me").json()["id"]
     with engine.begin() as connection:
-        connection.execute(text("UPDATE users SET role_code=:role WHERE id=:id"),
-                           {"role": "manager", "id": uuid.UUID(actor_id)})
+        connection.execute(
+            text("UPDATE users SET role_code=:role WHERE id=:id"),
+            {"role": "manager", "id": uuid.UUID(actor_id)},
+        )
     assert browser.get("/api/v1/inventory/drafts").status_code == 403
     assert browser.get(path).status_code == 403
     replay = browser.post(path + "/post", headers=headers(browser), json={"version": 1})
@@ -361,3 +369,65 @@ def test_draft_mutations_require_csrf_and_replay_requires_current_permission(dra
     with Session(engine) as session:
         assert session.scalar(select(func.count()).select_from(InventoryDocument)) == 1
         assert session.scalar(select(func.sum(InventoryMovement.delta))) == 5
+
+
+def test_draft_details_survive_save_reload_and_post(draft_context):
+    browser, _, item = draft_context
+    draft = create_draft(browser, item, supplier_name="Черновой поставщик")
+    path = "/api/v1/inventory/drafts/" + draft["id"]
+    payload = {**draft["payload"], "supplier_name": "  Итоговый поставщик  "}
+    saved = browser.patch(path, headers=headers(browser), json={"version": 1, "payload": payload})
+    assert saved.status_code == 200, saved.text
+    assert browser.get(path).json()["payload"]["supplier_name"] == "Итоговый поставщик"
+    posted = browser.post(path + "/post", headers=headers(browser), json={"version": 2})
+    assert posted.status_code == 201, posted.text
+    assert posted.json()["document"]["supplier_name"] == "Итоговый поставщик"
+    department = create_reference(
+        browser, "directory/departments", {"code": "ROOM", "name": "Отдел кабинета"}
+    )
+    employee = create_reference(
+        browser,
+        "directory/employees",
+        {
+            "personnel_number": "ROOM-01",
+            "full_name": "Получатель кабинета",
+            "department_id": department["id"],
+        },
+    )
+    draft = create_draft(
+        browser, item, "issue", recipient_employee_id=employee["id"], recipient_room="  314  "
+    )
+    path = "/api/v1/inventory/drafts/" + draft["id"]
+    assert browser.get(path).json()["payload"]["recipient_room"] == "314"
+    posted = browser.post(path + "/post", headers=headers(browser), json={"version": 1})
+    assert posted.status_code == 201, posted.text
+    assert posted.json()["document"]["recipient_room"] == "314"
+    assert posted.json()["document"]["recipient_department"] == "Отдел кабинета"
+
+
+@pytest.mark.parametrize("operation", ["create", "update"])
+def test_historic_draft_payload_replay_accepts_missing_optional_details(draft_context, operation):
+    browser, engine, item = draft_context
+    draft = create_draft(browser, item)
+    historic_payload = {k: v for k, v in draft["payload"].items() if k != "supplier_name"}
+    from app.modules.inventory.draft_models import InventoryDraft
+
+    with Session(engine) as session:
+        stored = session.get(InventoryDraft, uuid.UUID(draft["id"]))
+        stored.payload = historic_payload
+        if operation == "update":
+            stored.version = 2
+        session.commit()
+    if operation == "create":
+        replay = browser.post(
+            "/api/v1/inventory/drafts",
+            headers=headers(browser),
+            json={"id": draft["id"], "document_type": "receipt", "payload": historic_payload},
+        )
+    else:
+        replay = browser.patch(
+            "/api/v1/inventory/drafts/" + draft["id"],
+            headers=headers(browser),
+            json={"version": 1, "payload": historic_payload},
+        )
+    assert replay.status_code == 200, replay.text

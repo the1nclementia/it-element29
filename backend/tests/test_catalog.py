@@ -28,7 +28,8 @@ def test_inventory_schema_and_additive_upgrade(empty_database):
         )
         connection.execute(
             text(
-                "INSERT INTO employees(id,personnel_number,full_name,department_id) VALUES (:id,:number,:name,:department)"
+                "INSERT INTO employees(id,personnel_number,full_name,department_id) "
+                "VALUES (:id,:number,:name,:department)"
             ),
             {
                 "id": employee_id,
@@ -39,7 +40,8 @@ def test_inventory_schema_and_additive_upgrade(empty_database):
         )
         connection.execute(
             text(
-                "INSERT INTO locations(id,code,name,department_id) VALUES (:id,:code,:name,:department)"
+                "INSERT INTO locations(id,code,name,department_id) "
+                "VALUES (:id,:code,:name,:department)"
             ),
             {
                 "id": location_id,
@@ -54,9 +56,7 @@ def test_inventory_schema_and_additive_upgrade(empty_database):
 
         admin_id = admin.id
         password_hash = session.get(User, admin_id).password_hash
-        original_audit = session.scalar(
-            select(AuditLog).where(AuditLog.action == "user.bootstrap")
-        )
+        original_audit = session.scalar(select(AuditLog).where(AuditLog.action == "user.bootstrap"))
         audit_id, audit_time = original_audit.id, original_audit.occurred_at
 
     command.upgrade(config, "head")
@@ -494,9 +494,12 @@ def test_category_names_are_unique_across_case_whitespace_edits_and_archive(cata
     )
     assert duplicate.status_code == 409, duplicate.text
     assert client.get("/api/v1/inventory/categories", params={"q": "USB"}).json()["total"] == 0
-    assert client.get(
-        "/api/v1/inventory/categories", params={"q": "USB", "archived": "all"}
-    ).json()["total"] == 1
+    assert (
+        client.get("/api/v1/inventory/categories", params={"q": "USB", "archived": "all"}).json()[
+            "total"
+        ]
+        == 1
+    )
 
 
 def test_concurrent_category_names_cannot_create_duplicates(catalog):
@@ -507,10 +510,15 @@ def test_concurrent_category_names_cannot_create_duplicates(catalog):
         return client.post("/api/v1/inventory/categories", headers=auth, json=entry)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(create_category, [
-            {"code": "cables-a", "name": "USB Кабели"},
-            {"code": "cables-b", "name": "usb   КАБЕЛИ"},
-        ]))
+        results = list(
+            pool.map(
+                create_category,
+                [
+                    {"code": "cables-a", "name": "USB Кабели"},
+                    {"code": "cables-b", "name": "usb   КАБЕЛИ"},
+                ],
+            )
+        )
     assert sorted(result.status_code for result in results) == [201, 409], [
         result.text for result in results
     ]

@@ -24,7 +24,7 @@ import {
   type Employee,
 } from '../features/inventory/types';
 export function Documents() {
-  const {user} = useAuth();
+  const { user } = useAuth();
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
   const documents = useList<InventoryDocument>('/inventory/documents', {
@@ -116,7 +116,16 @@ export function Documents() {
               </Select>
             )}
           </Field>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={filters.created_by_id===user?.id} onChange={event=>filter('created_by_id',event.target.checked?user!.id:'')}/>Только мои операции</label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={filters.created_by_id === user?.id}
+              onChange={(event) =>
+                filter('created_by_id', event.target.checked ? user!.id : '')
+              }
+            />
+            Только мои операции
+          </label>
         </div>
         {documents.isPending ? (
           <LoadingState />

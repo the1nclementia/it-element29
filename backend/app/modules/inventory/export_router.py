@@ -58,8 +58,17 @@ def movements(
     item_id: uuid.UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    document_type: Literal["receipt", "issue", "reversal"] | None = None,
+    recipient_employee_id: uuid.UUID | None = None,
 ):
     return download(
-        export_movements(session, item_id=item_id, date_from=date_from, date_to=date_to),
+        export_movements(
+            session,
+            item_id=item_id,
+            date_from=date_from,
+            date_to=date_to,
+            document_type=document_type,
+            recipient_employee_id=recipient_employee_id,
+        ),
         "movements.xlsx",
     )

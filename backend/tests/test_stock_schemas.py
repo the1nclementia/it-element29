@@ -3,6 +3,7 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
+from app.modules.inventory.draft_schemas import IssueDraftPayload, ReceiptDraftPayload
 from app.modules.inventory.stock_schemas import IssueInput, ReceiptInput, ReversalInput
 
 
@@ -47,3 +48,29 @@ def test_receipt_purpose_and_reversal_reason():
     with pytest.raises(ValidationError):
         ReversalInput(reason="   ")
     assert ReversalInput(reason="  Ошибочная выдача  ").reason == "Ошибочная выдача"
+
+
+@pytest.mark.parametrize(
+    ("schema", "field", "limit"),
+    [
+        (ReceiptInput, "supplier_name", 200),
+        (IssueInput, "recipient_room", 100),
+        (ReceiptDraftPayload, "supplier_name", 200),
+        (IssueDraftPayload, "recipient_room", 100),
+    ],
+)
+def test_optional_document_details_are_trimmed_bounded_and_backward_compatible(
+    schema, field, limit
+):
+    value = issue()
+    if field == "supplier_name":
+        del value["recipient_employee_id"]
+    assert getattr(schema.model_validate(value), field) is None
+    assert getattr(schema.model_validate({**value, field: None}), field) is None
+    assert getattr(schema.model_validate({**value, field: "  Тестовый реквизит  "}), field) == (
+        "Тестовый реквизит"
+    )
+    assert getattr(schema.model_validate({**value, field: "Я" * limit}), field) == "Я" * limit
+    for invalid in ["Я" * (limit + 1), 123, True, []]:
+        with pytest.raises(ValidationError):
+            schema.model_validate({**value, field: invalid})

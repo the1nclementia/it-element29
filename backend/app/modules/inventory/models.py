@@ -116,9 +116,11 @@ class InventoryDocument(Base):
     recipient_name: Mapped[str | None] = mapped_column(String(300))
     recipient_personnel_number: Mapped[str | None] = mapped_column(String(50))
     recipient_department: Mapped[str | None] = mapped_column(String(200))
+    recipient_room: Mapped[str | None] = mapped_column(String(100))
     comment: Mapped[str] = mapped_column(Text, default="", server_default="")
     receipt_purpose: Mapped[str | None] = mapped_column(String(30))
     external_number: Mapped[str | None] = mapped_column(String(100))
+    supplier_name: Mapped[str | None] = mapped_column(String(200))
     reversal_of_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("inventory_documents.id", ondelete="RESTRICT"), unique=True
     )

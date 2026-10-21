@@ -30,10 +30,12 @@ class DocumentInput(StockInput):
 class ReceiptInput(DocumentInput):
     receipt_purpose: Literal["delivery", "opening_balance"] = "delivery"
     external_number: str | None = Field(default=None, max_length=100)
+    supplier_name: str | None = Field(default=None, max_length=200)
 
 
 class IssueInput(DocumentInput):
     recipient_employee_id: uuid.UUID
+    recipient_room: str | None = Field(default=None, max_length=100)
 
 
 class ReversalInput(StockInput):

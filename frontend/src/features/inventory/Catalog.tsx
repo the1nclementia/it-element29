@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ExportButton } from './ExportButton';
 import {
   EmptyState,
   ErrorState,
@@ -26,9 +27,14 @@ export function Catalog({
   disabled?: boolean;
   compact?: boolean;
 }) {
+  const [parameters] = useSearchParams();
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<Record<string, string>>(
+    !compact && parameters.get('low_stock') === 'true'
+      ? { low_stock: 'true' }
+      : {},
+  );
   const items = useList<InventoryItem>('/inventory/items', {
     q,
     offset: page * 20,
@@ -170,6 +176,13 @@ export function Catalog({
               Ниже минимального остатка
             </label>
           </div>
+        )}
+        {!compact && (
+          <ExportButton
+            kind="balances"
+            parameters={{ q, ...filters }}
+            label="Скачать остатки в Excel"
+          />
         )}
         {[categories.error, manufacturers.error, printers.error]
           .filter(Boolean)

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Archive,
+  ArrowDownToLine,
   ArrowLeftRight,
   BarChart3,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   FileChartColumn,
+  FilePenLine,
   History,
   LayoutDashboard,
   LogOut,
@@ -30,6 +32,7 @@ export const modules: {
   path: string;
   label: string;
   permission: string;
+  alternativePermission?: string;
   icon: LucideIcon;
   group: string;
   description: string;
@@ -49,6 +52,23 @@ export const modules: {
     icon: Archive,
     group: 'Рабочее пространство',
     description: 'Расходные материалы, остатки и поступления',
+  },
+  {
+    path: '/inventory/receipt',
+    label: 'Поступления',
+    permission: 'inventory.manage',
+    icon: ArrowDownToLine,
+    group: 'Рабочее пространство',
+    description: 'Поступление расходных материалов на склад',
+  },
+  {
+    path: '/inventory/drafts',
+    label: 'Мои черновики',
+    permission: 'inventory.issue',
+    alternativePermission: 'inventory.manage',
+    icon: FilePenLine,
+    group: 'Рабочее пространство',
+    description: 'Незавершённые поступления и выдачи',
   },
   {
     path: '/issues',
@@ -85,7 +105,7 @@ export const modules: {
   {
     path: '/history',
     label: 'История',
-    permission: 'history.read',
+    permission: 'inventory.read',
     icon: History,
     group: 'Аналитика',
     description: 'История операций с ИТ-ресурсами',
@@ -101,7 +121,7 @@ export const modules: {
   {
     path: '/reports',
     label: 'Отчёты',
-    permission: 'reports.read',
+    permission: 'inventory.read',
     icon: FileChartColumn,
     group: 'Аналитика',
     description: 'Отчётность по ресурсам организации',
@@ -154,8 +174,10 @@ export function Sidebar({
 
   const visible = modules.filter(
     (module) =>
-      user?.permissions.includes(module.permission) &&
-      (!user.must_change_password || module.path === '/settings'),
+      (user?.permissions.includes(module.permission) ||
+        (!!module.alternativePermission &&
+          user?.permissions.includes(module.alternativePermission))) &&
+      (!user?.must_change_password || module.path === '/settings'),
   );
 
   const groups = ['Рабочее пространство', 'Аналитика', 'Управление'];
@@ -199,7 +221,7 @@ export function Sidebar({
                   <NavLink
                     key={path}
                     to={path}
-                    end={path === '/'}
+                    end={path === '/' || path === '/inventory'}
                     title={collapsed ? label : undefined}
                     onClick={onNavigate}
                     className={({ isActive }) =>
@@ -207,7 +229,7 @@ export function Sidebar({
                         'flex min-h-11 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors',
                         collapsed && 'justify-center',
                         isActive
-                          ? 'bg-blue-50 text-primary'
+                          ? 'bg-primary-light text-primary-hover'
                           : 'text-muted hover:bg-slate-50 hover:text-foreground',
                       )
                     }
@@ -253,7 +275,13 @@ export function Header({ onMenu }: { onMenu: () => void }) {
 
   const name =
     modules.find((module) => module.path === location.pathname)?.label ??
-    'Страница';
+    (location.pathname.startsWith('/inventory/documents')
+      ? 'Документы склада'
+      : location.pathname.startsWith('/inventory/items')
+        ? 'Номенклатура'
+        : location.pathname === '/inventory/catalogs'
+          ? 'Справочники склада'
+          : 'Страница');
 
   const initials = (user?.display_name ?? '')
     .split(' ')
@@ -309,7 +337,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           <Link
             to="/settings"
             aria-label="Мой профиль"
-            className="flex size-10 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-primary"
+            className="flex size-10 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary-hover"
           >
             {initials}
           </Link>
@@ -341,7 +369,10 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
   return (
-    <div className="min-h-dvh">
+    <div className="relative isolate min-h-dvh">
+      <span className="brand-watermark" aria-hidden="true">
+        [29]
+      </span>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-white focus:p-3"

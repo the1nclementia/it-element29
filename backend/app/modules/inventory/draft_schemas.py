@@ -23,10 +23,12 @@ class DraftPayload(StockInput):
 class ReceiptDraftPayload(DraftPayload):
     receipt_purpose: Literal["delivery", "opening_balance"] = "delivery"
     external_number: str | None = Field(default=None, max_length=100)
+    supplier_name: str | None = Field(default=None, max_length=200)
 
 
 class IssueDraftPayload(DraftPayload):
     recipient_employee_id: uuid.UUID | None = None
+    recipient_room: str | None = Field(default=None, max_length=100)
 
 
 class DraftCreate(StockInput):

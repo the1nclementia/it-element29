@@ -154,7 +154,13 @@ def export_balances(session: Session, **filters) -> bytes:
 
 
 def export_movements(
-    session: Session, *, item_id: uuid.UUID | None, date_from: date | None, date_to: date | None
+    session: Session,
+    *,
+    item_id: uuid.UUID | None,
+    date_from: date | None,
+    date_to: date | None,
+    document_type: str | None = None,
+    recipient_employee_id: uuid.UUID | None = None,
 ) -> bytes:
     if date_from and date_to and date_from > date_to:
         fail(422, "invalid_date_range", "Начало периода должно быть не позднее окончания.")
@@ -170,6 +176,10 @@ def export_movements(
         query = query.where(InventoryDocument.document_date >= date_from)
     if date_to:
         query = query.where(InventoryDocument.document_date <= date_to)
+    if document_type:
+        query = query.where(InventoryDocument.document_type == document_type)
+    if recipient_employee_id:
+        query = query.where(InventoryDocument.recipient_employee_id == recipient_employee_id)
     query = query.order_by(InventoryMovement.occurred_at, InventoryMovement.id).limit(
         MAX_EXPORT_ROWS + 1
     )
@@ -188,6 +198,8 @@ def export_movements(
             operator,
             str(document.reversal_of_id) if document.reversal_of_id else "",
             document.reason,
+            document.supplier_name,
+            document.recipient_room,
         ]
         for movement, line, document, operator in session.execute(query)
     ]
@@ -207,6 +219,8 @@ def export_movements(
             "Оператор",
             "Отмена документа UUID",
             "Причина отмены",
+            "Поставщик (снимок)",
+            "Кабинет (снимок)",
         ],
         rows,
     )
