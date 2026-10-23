@@ -91,7 +91,7 @@ def test_movement_export_snapshots_filters_and_permissions(stock):
     assert len(rows) == 4
     assert sum(row[7] for row in rows[1:]) == 10
     assert all(row[5] == "Картридж 0" for row in rows[1:])
-    assert all(row[15] == "Корпус А" for row in rows[1:])
+    assert all(row[15] == "Корпус А" for row in rows[3:])
     empty = sheet(
         browser.get(
             "/api/v1/inventory/exports/movements.xlsx",

@@ -411,7 +411,7 @@ def test_history_snapshots_and_restore_archived_item(stock):
 
 def test_manual_recipient_issue_preserves_text_snapshots_without_employee(stock):
     browser, engine, _, ids = stock
-    receive(stock, (ids["items"][0], 2))
+    receive(stock, (2, 2))
     response = post(
         browser,
         "issues",

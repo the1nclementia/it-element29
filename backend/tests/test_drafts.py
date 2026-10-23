@@ -407,7 +407,25 @@ def test_draft_details_survive_save_reload_and_post(draft_context):
 
 def test_employee_recipient_building_survives_draft_reload_and_post(draft_context):
     browser, _, item = draft_context
-    employee = browser.get("/api/v1/directory/employees").json()["items"][0]
+    receipt = create_draft(browser, item)
+    received = browser.post(
+        "/api/v1/inventory/drafts/" + receipt["id"] + "/post",
+        headers=headers(browser),
+        json={"version": 1},
+    )
+    assert received.status_code == 201, received.text
+    department = create_reference(
+        browser, "directory/departments", {"code": "BUILDING", "name": "Отдел здания"}
+    )
+    employee = create_reference(
+        browser,
+        "directory/employees",
+        {
+            "personnel_number": "BUILDING-01",
+            "full_name": "Получатель здания",
+            "department_id": department["id"],
+        },
+    )
     draft = create_draft(
         browser,
         item,
@@ -426,6 +444,13 @@ def test_employee_recipient_building_survives_draft_reload_and_post(draft_contex
 
 def test_manual_recipient_details_survive_draft_reload_and_post(draft_context):
     browser, _, item = draft_context
+    receipt = create_draft(browser, item)
+    received = browser.post(
+        "/api/v1/inventory/drafts/" + receipt["id"] + "/post",
+        headers=headers(browser),
+        json={"version": 1},
+    )
+    assert received.status_code == 201, received.text
     draft = create_draft(
         browser,
         item,
