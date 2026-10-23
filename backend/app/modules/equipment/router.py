@@ -1,9 +1,10 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query, Response
 
-from app.modules.equipment import service
+from app.modules.equipment import movement_service, service
+from app.modules.equipment.movement_schemas import EquipmentMoveInput
 from app.modules.equipment.schemas import EquipmentInstanceCreate, EquipmentInstancePatch
 from app.modules.identity.dependencies import CsrfSession, Database, require_permission
 from app.modules.identity.models import User
@@ -12,6 +13,8 @@ from app.modules.inventory.schemas import VersionInput
 router = APIRouter(prefix="/equipment", tags=["Оборудование"])
 Reader = Annotated[User, Depends(require_permission("equipment.read"))]
 Manager = Annotated[User, Depends(require_permission("equipment.manage"))]
+MovementReader = Annotated[User, Depends(require_permission("movements.read"))]
+MovementManager = Annotated[User, Depends(require_permission("movements.manage"))]
 
 
 @router.get("/instances")
@@ -79,3 +82,28 @@ def restore_instance(
     csrf: CsrfSession,
 ):
     return service.archive(session, actor, csrf.token_hash, instance_id, payload.version, False)
+
+
+@router.post("/movements", status_code=201)
+def move_instances(
+    payload: EquipmentMoveInput,
+    session: Database,
+    actor: MovementManager,
+    csrf: CsrfSession,
+    key: Annotated[uuid.UUID, Header(alias="Idempotency-Key")],
+    response: Response,
+):
+    result, created = movement_service.move(session, actor, csrf.token_hash, key, payload)
+    response.status_code = 201 if created else 200
+    return result
+
+
+@router.get("/movements")
+def movement_history(
+    session: Database,
+    actor: MovementReader,
+    instance_id: uuid.UUID | None = None,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    return movement_service.history(session, instance_id, offset, limit)

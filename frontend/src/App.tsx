@@ -21,6 +21,7 @@ import { Documents, DocumentDetails } from './pages/Documents';
 import { Directory } from './pages/Directory';
 import { Reports } from './pages/Reports';
 import { Equipment } from './pages/Equipment';
+import { Movements } from './pages/Movements';
 import { Drafts } from './pages/Drafts';
 import { StockForm } from './features/issues/StockForm';
 import { WarehouseProvider } from './features/issues/state';
@@ -145,6 +146,14 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="movements"
+            element={
+              <ProtectedRoute permission="movements.read">
+                <Movements />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="inventory/catalogs"
             element={
               <ProtectedRoute permission="inventory.read">
@@ -233,6 +242,7 @@ export function AppRoutes() {
                   '/history',
                   '/reports',
                   '/equipment',
+                  '/movements',
                 ].includes(module.path),
             )
             .map((module) => (

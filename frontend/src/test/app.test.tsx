@@ -25,12 +25,14 @@ let currentUser: typeof user | null;
 let requests: { path: string; options?: RequestInit }[];
 let dashboardDocuments: InventoryDocument[];
 let dashboardItems: InventoryItem[];
+let equipmentInstances: Record<string, unknown>[];
 let documentFailure: boolean;
 beforeEach(() => {
   currentUser = { ...user };
   requests = [];
   dashboardDocuments = [];
   dashboardItems = [];
+  equipmentInstances = [];
   documentFailure = false;
   vi.stubGlobal(
     'fetch',
@@ -116,6 +118,13 @@ beforeEach(() => {
           items: dashboardItems,
           total: dashboardItems.length,
         });
+      if (path.includes('/equipment/instances'))
+        return Response.json({
+          items: equipmentInstances,
+          total: equipmentInstances.length,
+        });
+      if (path.includes('/equipment/movements'))
+        return Response.json({ items: [], total: 0 });
       if (path.includes('/directory/employees'))
         return Response.json({ items: [], total: 0 });
       if (path.includes('/users') && options?.method)
@@ -429,19 +438,57 @@ describe('Авторизация и интерфейс', () => {
     ).toBeVisible();
     expect(requests.some((r) => r.path.includes('/users'))).toBe(false);
   });
-  it('помечает будущий модуль как находящийся в разработке', async () => {
+  it('открывает реестр оборудования через рабочий API', async () => {
     currentUser = {
       ...user,
       permissions: [...user.permissions, 'equipment.read'],
     };
+    equipmentInstances = [
+      {
+        id: 'equipment-1',
+        version: 1,
+        archived_at: null,
+        created_at: '2026-10-22T10:00:00Z',
+        updated_at: '2026-10-22T10:00:00Z',
+        inventory_item_id: 'item-1',
+        internal_code: 'EQ-001',
+        model: 'ThinkCentre M90',
+        manufacturer_id: 'maker-1',
+        manufacturer_name: 'Lenovo',
+        serial_number: 'SN-001',
+        identification_warning: null,
+        inventory_number: 'INV-001',
+        current_building: 'Корпус А',
+        current_room: '305',
+        current_department: 'ИТ',
+        current_recipient: null,
+        is_under_repair: false,
+      },
+    ];
     app('/equipment');
     expect(
       await screen.findByRole('heading', { name: 'Оборудование' }),
     ).toBeVisible();
-    expect(screen.getByText('В разработке')).toBeVisible();
+    expect(await screen.findByText('Lenovo ThinkCentre M90')).toBeVisible();
+    expect(screen.getByText('SN-001')).toBeVisible();
+    expect(screen.getByText('INV-001')).toBeVisible();
+    expect(screen.getByText('Корпус А')).toBeVisible();
+    expect(screen.queryByText('В разработке')).not.toBeInTheDocument();
+  });
+  it('показывает рабочую форму перемещений при наличии права чтения', async () => {
+    currentUser = {
+      ...user,
+      permissions: [...user.permissions, 'movements.read'],
+    };
+    app('/movements');
     expect(
-      screen.queryByRole('button', { name: /добавить|выдать|создать/i }),
-    ).not.toBeInTheDocument();
+      await screen.findByRole('heading', { name: 'Перемещения' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'История перемещений' }),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Здание назначения')).toBeVisible();
+    expect(screen.getByText('Перемещений пока нет')).toBeVisible();
   });
   it('истечение сессии на API очищает загруженные данные и открывает вход', async () => {
     const client = app();

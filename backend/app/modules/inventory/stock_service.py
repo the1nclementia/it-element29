@@ -42,7 +42,14 @@ def request_hash(payload: dict) -> str:
         if normalized.get(field) is None:
             normalized.pop(field, None)
     if "items" in normalized:
-        normalized["items"] = sorted(normalized["items"], key=lambda row: row["inventory_item_id"])
+        item_key = (
+            "inventory_item_id"
+            if all("inventory_item_id" in row for row in normalized["items"])
+            else "equipment_instance_id"
+        )
+        normalized["items"] = sorted(
+            normalized["items"], key=lambda row: str(row.get(item_key, ""))
+        )
     return hashlib.sha256(
         json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     ).hexdigest()
