@@ -2,6 +2,32 @@
 
 Дата текущей работы: 2026-10-23 (Asia/Yekaterinburg).
 
+## Уточнение по `spawn EPERM` (23.10.2026)
+
+Независимый запуск в обычном PowerShell Windows подтвердил, что проблема не
+относится к исходному коду frontend: `Node.js child_process.spawnSync()` запускает
+`frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/esbuild.exe`
+успешно (`status: 0`, версия `0.28.2`), а `node
+node_modules/vite/bin/vite.js build` проходит с обработкой 1848 модулей.
+Production-сборка того же исходного дерева также прошла внутри Docker при обновлении
+тестового стенда `e29-stage3-acceptance`.
+
+В Codex sandbox дочерний запуск блокируется на границе `ChildProcess.spawn` с
+`EPERM` до выполнения тестов или Vite build. В этой среде файл существует, имеет
+расширение `.exe`, прямой запуск и Docker build работают, но политика sandbox
+ограничивает создание дочернего процесса из локального Node/Vite shell. Это
+средовая блокировка Codex, а не ошибка проекта, ассоциации Windows или установка
+esbuild. Node.js, pnpm, esbuild и `node_modules` не переустанавливались.
+
+Рекомендуемый устойчивый запуск frontend-проверок: обычный пользовательский
+PowerShell Windows из `frontend` (`node node_modules/vitest/vitest.mjs run`,
+`node node_modules/vite/bin/vite.js build`, `node node_modules/prettier/bin/prettier.cjs
+--check ...`) либо Docker build для production-сборки. Постоянная пересборка
+контейнеров для каждого запуска не нужна; Docker использован только как безопасное
+подтверждение и для обновления тестового frontend на 8082. В Codex остаются
+непроверенными только локальный Vitest-прогон и локальный Vite build; их результаты
+нельзя маркировать как ошибки проекта.
+
 ## Активная работа — новое ТЗ от 22.10.2026
 
 Пользователь поручил сначала аудит и план, затем последовательную реализацию;
