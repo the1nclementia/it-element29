@@ -20,6 +20,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, RecordMixin
 
 inventory_document_number_seq = Sequence("inventory_document_number_seq", metadata=Base.metadata)
+inventory_category_code_seq = Sequence("inventory_category_code_seq", metadata=Base.metadata)
+inventory_item_code_seq = Sequence("inventory_item_code_seq", metadata=Base.metadata)
 
 
 class Manufacturer(RecordMixin, Base):
@@ -114,6 +116,7 @@ class InventoryDocument(Base):
         ForeignKey("employees.id", ondelete="RESTRICT"), index=True
     )
     recipient_name: Mapped[str | None] = mapped_column(String(300))
+    recipient_building: Mapped[str | None] = mapped_column(String(200))
     recipient_personnel_number: Mapped[str | None] = mapped_column(String(50))
     recipient_department: Mapped[str | None] = mapped_column(String(200))
     recipient_room: Mapped[str | None] = mapped_column(String(100))

@@ -16,6 +16,9 @@ export interface BasketLine {
 export interface Draft {
   lines: BasketLine[];
   employee: string;
+  recipientName: string;
+  recipientBuilding: string;
+  recipientDepartment: string;
   date: string;
   comment: string;
   purpose: string;
@@ -47,6 +50,9 @@ export function today() {
 const emptyDraft = (): Draft => ({
   lines: [],
   employee: '',
+  recipientName: '',
+  recipientBuilding: '',
+  recipientDepartment: '',
   date: today(),
   comment: '',
   purpose: 'delivery',

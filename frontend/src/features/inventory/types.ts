@@ -89,6 +89,7 @@ export interface InventoryDocument {
   recipient_name: string | null;
   recipient_personnel_number: string | null;
   recipient_department: string | null;
+  recipient_building: string | null;
   comment: string | null;
   receipt_purpose: string | null;
   external_number: string | null;

@@ -123,7 +123,9 @@ export function ItemDetails() {
             </StatusBadge>
             {item.is_low_stock && (
               <span className="text-sm text-orange-700">
-                Ниже минимального остатка
+                {item.balance === 0
+                  ? 'Нет в наличии'
+                  : 'Достигнут минимальный остаток — требуется пополнение'}
               </span>
             )}
           </div>

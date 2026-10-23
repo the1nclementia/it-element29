@@ -102,7 +102,8 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
         )
 
     execute(
-        sql.SQL("GRANT USAGE ON SEQUENCE inventory_document_number_seq TO {}").format(
-            sql.Identifier(role)
-        )
+        sql.SQL(
+            "GRANT USAGE ON SEQUENCE inventory_document_number_seq, "
+            "inventory_category_code_seq, inventory_item_code_seq TO {}"
+        ).format(sql.Identifier(role))
     )

@@ -32,7 +32,13 @@ MAX_BALANCE = 9_007_199_254_740_991
 def request_hash(payload: dict) -> str:
     normalized = dict(payload)
     # New optional metadata must not invalidate idempotency keys issued before 0005.
-    for field in ("supplier_name", "recipient_room"):
+    for field in (
+        "supplier_name",
+        "recipient_name",
+        "recipient_building",
+        "recipient_department",
+        "recipient_room",
+    ):
         if normalized.get(field) is None:
             normalized.pop(field, None)
     if "items" in normalized:
@@ -196,14 +202,25 @@ def conduct(
         return previous, False
     recipient = {}
     if issue:
-        employee, department = lock_recipient(session, payload.recipient_employee_id)
-        recipient = {
-            "recipient_employee_id": employee.id,
-            "recipient_name": employee.full_name,
-            "recipient_personnel_number": employee.personnel_number,
-            "recipient_department": department.name,
-            "recipient_room": payload.recipient_room,
-        }
+        if payload.recipient_employee_id is not None:
+            employee, department = lock_recipient(session, payload.recipient_employee_id)
+            recipient = {
+                "recipient_employee_id": employee.id,
+                "recipient_name": employee.full_name,
+                "recipient_personnel_number": employee.personnel_number,
+                "recipient_department": department.name,
+                "recipient_building": payload.recipient_building,
+                "recipient_room": payload.recipient_room,
+            }
+        else:
+            recipient = {
+                "recipient_employee_id": None,
+                "recipient_name": payload.recipient_name,
+                "recipient_personnel_number": None,
+                "recipient_department": payload.recipient_department,
+                "recipient_building": payload.recipient_building,
+                "recipient_room": payload.recipient_room,
+            }
     items = lock_items(session, [line.inventory_item_id for line in payload.items])
     revalidate_mutation(session, actor, session_hash, permission)
     if any(item.archived_at for item in items.values()):
@@ -299,6 +316,7 @@ def cancel(
         recipient_personnel_number=original.recipient_personnel_number,
         recipient_department=original.recipient_department,
         recipient_room=original.recipient_room,
+        recipient_building=original.recipient_building,
         supplier_name=original.supplier_name,
     )
     for line, movement in lines:

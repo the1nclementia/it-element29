@@ -33,8 +33,11 @@ export function DocumentCard({ document }: { document: InventoryDocument }) {
           <div>
             <dt className="text-muted">Получатель</dt>
             <dd className="break-words">
-              {document.recipient_name} · {document.recipient_personnel_number}{' '}
-              · {document.recipient_department}
+              {document.recipient_name}
+              {document.recipient_personnel_number &&
+                ` · ${document.recipient_personnel_number}`}
+              {document.recipient_department &&
+                ` · ${document.recipient_department}`}
             </dd>
           </div>
         )}
@@ -48,6 +51,12 @@ export function DocumentCard({ document }: { document: InventoryDocument }) {
           <div>
             <dt className="text-muted">Кабинет</dt>
             <dd className="break-words">{document.recipient_room}</dd>
+          </div>
+        )}
+        {document.recipient_building && (
+          <div>
+            <dt className="text-muted">Здание</dt>
+            <dd className="break-words">{document.recipient_building}</dd>
           </div>
         )}
         {document.receipt_purpose && (

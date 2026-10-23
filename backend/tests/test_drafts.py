@@ -405,6 +405,49 @@ def test_draft_details_survive_save_reload_and_post(draft_context):
     assert posted.json()["document"]["recipient_department"] == "Отдел кабинета"
 
 
+def test_employee_recipient_building_survives_draft_reload_and_post(draft_context):
+    browser, _, item = draft_context
+    employee = browser.get("/api/v1/directory/employees").json()["items"][0]
+    draft = create_draft(
+        browser,
+        item,
+        "issue",
+        recipient_employee_id=employee["id"],
+        recipient_building=" Корпус В ",
+    )
+    path = "/api/v1/inventory/drafts/" + draft["id"]
+    loaded = browser.get(path).json()["payload"]
+    assert loaded["recipient_building"] == "Корпус В"
+    posted = browser.post(path + "/post", headers=headers(browser), json={"version": 1})
+    assert posted.status_code == 201, posted.text
+    assert posted.json()["document"]["recipient_employee_id"] == employee["id"]
+    assert posted.json()["document"]["recipient_building"] == "Корпус В"
+
+
+def test_manual_recipient_details_survive_draft_reload_and_post(draft_context):
+    browser, _, item = draft_context
+    draft = create_draft(
+        browser,
+        item,
+        "issue",
+        recipient_name="  Ручной получатель  ",
+        recipient_building=" Корпус Б ",
+        recipient_department=" Снабжение ",
+        recipient_room=" 214 ",
+    )
+    path = "/api/v1/inventory/drafts/" + draft["id"]
+    loaded = browser.get(path).json()["payload"]
+    assert loaded["recipient_name"] == "Ручной получатель"
+    assert loaded["recipient_building"] == "Корпус Б"
+    assert loaded["recipient_department"] == "Снабжение"
+    assert loaded["recipient_room"] == "214"
+    posted = browser.post(path + "/post", headers=headers(browser), json={"version": 1})
+    assert posted.status_code == 201, posted.text
+    assert posted.json()["document"]["recipient_employee_id"] is None
+    assert posted.json()["document"]["recipient_name"] == "Ручной получатель"
+    assert posted.json()["document"]["recipient_building"] == "Корпус Б"
+
+
 @pytest.mark.parametrize("operation", ["create", "update"])
 def test_historic_draft_payload_replay_accepts_missing_optional_details(draft_context, operation):
     browser, engine, item = draft_context

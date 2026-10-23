@@ -17,12 +17,16 @@ from app.modules.inventory.models import (
     InventoryItem,
     Manufacturer,
     PrinterModel,
+    inventory_category_code_seq,
+    inventory_item_code_seq,
 )
 from app.modules.inventory.repository import (
     archived_filter,
     balance_query,
     escaped_like,
     get_balance,
+    is_low_stock,
+    low_stock_expression,
 )
 
 
@@ -55,6 +59,16 @@ def commit(session: Session):
     except IntegrityError:
         session.rollback()
         fail(409, "duplicate_record", "Запись с такими уникальными полями уже существует.")
+
+
+def next_generated_code(session: Session, model, sequence, prefix: str) -> str:
+    """Allocate a stable code while avoiding explicit legacy codes."""
+    while True:
+        number = session.scalar(select(sequence.next_value()))
+        candidate = f"{prefix}-{number:06d}"
+        code_column = model.code if model is InventoryCategory else model.internal_code
+        if session.scalar(select(model.id).where(code_column == candidate)) is None:
+            return candidate
 
 
 def base_response(record):
@@ -107,7 +121,7 @@ def item_response(session: Session, item: InventoryItem, balance: int | None = N
         "manufacturer_name": session.get(Manufacturer, item.manufacturer_id).name,
         "balance": balance,
         "unit": "pcs",
-        "is_low_stock": item.min_stock > 0 and balance < item.min_stock,
+        "is_low_stock": is_low_stock(balance, item.min_stock),
         "primary_photo_url": f"/api/v1/inventory/items/{item.id}/photos/{photo_id}/content"
         if photo_id
         else None,
@@ -183,6 +197,10 @@ def save_reference(session: Session, actor, session_hash, model, payload, record
         values["name_key"] = normalize_key(values["name"])
     if model is PrinterModel and "model" in values:
         values["model_key"] = normalize_key(values["model"])
+    if record is None and model is InventoryCategory and values.get("code") is None:
+        values["code"] = next_generated_code(
+            session, InventoryCategory, inventory_category_code_seq, "CAT"
+        )
     if record is None:
         record = model(**values)
         session.add(record)
@@ -272,7 +290,7 @@ def item_query(
     if in_stock is not None:
         statement = statement.where((amount > 0) if in_stock else (amount == 0))
     if low_stock is not None:
-        low = (InventoryItem.min_stock > 0) & (amount < InventoryItem.min_stock)
+        low = low_stock_expression(amount, InventoryItem.min_stock)
         statement = statement.where(low if low_stock else ~low)
     order = {"code": InventoryItem.internal_code, "model": InventoryItem.model, "balance": amount}[
         sort
@@ -326,6 +344,14 @@ def save_item(session: Session, actor, session_hash, payload, item_id=None):
             fail(409, "record_archived", "Сначала восстановите позицию из архива.")
     revalidate_mutation(session, actor, session_hash, "inventory.manage")
     if item is None:
+        if values.get("internal_code") is None:
+            session.execute(
+                text("SELECT pg_advisory_xact_lock(:namespace, :resource)"),
+                {"namespace": 29, "resource": 4},
+            )
+            values["internal_code"] = next_generated_code(
+                session, InventoryItem, inventory_item_code_seq, "ITEM"
+            )
         item = InventoryItem(**values)
         session.add(item)
     else:

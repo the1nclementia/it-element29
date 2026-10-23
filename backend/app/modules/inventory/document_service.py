@@ -34,6 +34,7 @@ def document_response(session: Session, document: InventoryDocument) -> dict:
             "recipient_personnel_number",
             "recipient_department",
             "recipient_room",
+            "recipient_building",
             "comment",
             "receipt_purpose",
             "external_number",

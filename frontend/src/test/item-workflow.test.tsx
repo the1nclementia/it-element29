@@ -99,7 +99,6 @@ function show(children: React.ReactNode) {
 }
 async function fill() {
   const events = userEvent.setup();
-  await events.type(screen.getByLabelText('Внутренний код'), 'NEW');
   await events.selectOptions(screen.getByLabelText('Категория'), 'category');
   await events.selectOptions(screen.getByLabelText('Производитель'), 'maker');
   await events.type(screen.getByLabelText('Модель расходника'), 'Модель');

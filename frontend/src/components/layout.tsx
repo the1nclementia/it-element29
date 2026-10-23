@@ -306,7 +306,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   return (
     <>
       <header className="flex h-20 shrink-0 items-center justify-between gap-3 border-b border-border bg-white px-5 sm:px-8">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -317,13 +317,55 @@ export function Header({ onMenu }: { onMenu: () => void }) {
             <Menu />
           </Button>
 
-          <div className="text-sm">
-            <span className="hidden text-slate-400 sm:inline">
-              Рабочее пространство
-              <span className="mx-3 text-slate-300">/</span>
-            </span>
-            <span className="font-medium">{name}</span>
-          </div>
+          <nav
+            aria-label="Хлебные крошки"
+            className="min-w-0 text-xs sm:text-sm"
+          >
+            <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {location.pathname !== '/' && (
+                <li className="flex items-center gap-2">
+                  <Link
+                    to="/"
+                    className="text-muted hover:text-foreground hover:underline"
+                  >
+                    Обзор
+                  </Link>
+                  <span aria-hidden="true" className="text-slate-300">
+                    /
+                  </span>
+                </li>
+              )}
+              {location.pathname.startsWith('/inventory/') && (
+                <li className="flex items-center gap-2">
+                  <Link
+                    to="/inventory"
+                    className="text-muted hover:text-foreground hover:underline"
+                  >
+                    Склад
+                  </Link>
+                  <span aria-hidden="true" className="text-slate-300">
+                    /
+                  </span>
+                </li>
+              )}
+              {location.pathname.startsWith('/inventory/documents/') && (
+                <li className="flex items-center gap-2">
+                  <Link
+                    to="/history"
+                    className="text-muted hover:text-foreground hover:underline"
+                  >
+                    История
+                  </Link>
+                  <span aria-hidden="true" className="text-slate-300">
+                    /
+                  </span>
+                </li>
+              )}
+              <li aria-current="page" className="font-medium">
+                {name}
+              </li>
+            </ol>
+          </nav>
         </div>
 
         <div className="flex items-center gap-3">

@@ -50,7 +50,7 @@ const actions = [
     icon: PackagePlus,
   },
   {
-    label: 'Оформить выдачу',
+    label: 'Новая выдача',
     description: 'Передать сотруднику',
     path: '/issues',
     permission: 'inventory.issue',
@@ -265,7 +265,7 @@ export function Dashboard() {
             ) : lowStock.data.items.length === 0 ? (
               <EmptyState
                 title="Все остатки в норме"
-                description="Позиций с остатком ниже установленного минимума нет."
+                description="Все активные позиции есть в наличии, их остатки выше установленного минимума."
                 icon={Package}
               />
             ) : (
@@ -283,6 +283,11 @@ export function Dashboard() {
                           </p>
                           <p className="mt-1 text-xs text-muted">
                             {item.internal_code} · Минимум {item.min_stock} шт.
+                          </p>
+                          <p className="mt-1 text-xs text-orange-700">
+                            {item.balance === 0
+                              ? 'Нет в наличии'
+                              : 'Достигнут минимальный остаток'}
                           </p>
                         </div>
                         <span className="shrink-0 rounded-lg bg-primary-light px-2.5 py-1.5 text-sm font-semibold text-primary">

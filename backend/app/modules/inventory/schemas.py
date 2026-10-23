@@ -37,12 +37,14 @@ class ManufacturerPatch(VersionInput):
 
 
 class CategoryCreate(CatalogInput):
-    code: Code
+    code: Code | None = None
     name: Name
 
-    @field_validator("code")
+    @field_validator("code", mode="before")
     @classmethod
     def category_code(cls, value):
+        if value is None:
+            return value
         value = value.lower()
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", value):
             raise ValueError("Код категории: латинские буквы, цифры, дефис или подчёркивание")
@@ -73,12 +75,12 @@ class ItemFields(CatalogInput):
 
 
 class ItemCreate(ItemFields):
-    internal_code: Code
+    internal_code: Code | None = None
 
     @field_validator("internal_code")
     @classmethod
     def uppercase_code(cls, value):
-        return value.upper()
+        return value.upper() if value is not None else value
 
 
 class ItemPatch(VersionInput):

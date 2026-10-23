@@ -14,6 +14,7 @@ from app.modules.inventory.models import (
     InventoryItem,
     InventoryMovement,
 )
+from app.modules.inventory.repository import low_stock_expression
 
 router = APIRouter(tags=["Главная"])
 METRICS = [
@@ -69,8 +70,7 @@ def dashboard(
     )
     low_stock = session.scalar(
         active.with_only_columns(func.count(InventoryItem.id)).where(
-            InventoryItem.min_stock > 0,
-            quantity < InventoryItem.min_stock,
+            low_stock_expression(quantity, InventoryItem.min_stock),
         )
     )
     zone = ZoneInfo("Asia/Yekaterinburg")

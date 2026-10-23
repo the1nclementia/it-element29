@@ -28,7 +28,17 @@ class ReceiptDraftPayload(DraftPayload):
 
 class IssueDraftPayload(DraftPayload):
     recipient_employee_id: uuid.UUID | None = None
+    recipient_name: str | None = Field(default=None, max_length=300)
+    recipient_building: str | None = Field(default=None, max_length=200)
+    recipient_department: str | None = Field(default=None, max_length=200)
     recipient_room: str | None = Field(default=None, max_length=100)
+
+    @field_validator(
+        "recipient_name", "recipient_building", "recipient_department", "recipient_room"
+    )
+    @classmethod
+    def trim_recipient_fields(cls, value):
+        return value.strip() if value is not None else value
 
 
 class DraftCreate(StockInput):

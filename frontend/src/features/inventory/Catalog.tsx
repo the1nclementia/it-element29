@@ -173,7 +173,7 @@ export function Catalog({
                   filter('low_stock', e.target.checked ? 'true' : '')
                 }
               />
-              Ниже минимального остатка
+              Требуют пополнения
             </label>
           </div>
         )}
@@ -243,7 +243,9 @@ export function Catalog({
                 </p>
                 {item.is_low_stock && (
                   <p className="text-xs text-orange-700">
-                    Ниже минимума {item.min_stock}
+                    {item.balance === 0
+                      ? 'Нет в наличии'
+                      : `Минимум ${item.min_stock} — требуется пополнение`}
                   </p>
                 )}
               </div>

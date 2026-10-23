@@ -47,11 +47,11 @@ export function ReferenceSelect({
     setError('');
     if (
       !name.trim() ||
-      (category && !/^[a-z0-9][a-z0-9_-]*$/i.test(code.trim()))
+      (category && code.trim() && !/^[a-z0-9][a-z0-9_-]*$/i.test(code.trim()))
     ) {
       setError(
         category
-          ? 'Укажите название и код категории: латинские буквы, цифры, дефис или подчёркивание.'
+          ? 'Укажите название и корректный код категории либо оставьте код пустым для генерации.'
           : 'Укажите название производителя.',
       );
       return;
@@ -64,7 +64,9 @@ export function ReferenceSelect({
           method: 'POST',
           body: {
             name: name.trim(),
-            ...(category ? { code: code.trim().toLowerCase() } : {}),
+            ...(category && code.trim()
+              ? { code: code.trim().toLowerCase() }
+              : {}),
           },
         },
       );
@@ -209,7 +211,7 @@ export function ReferenceSelect({
           {category && (
             <Field
               label="Код новой категории"
-              hint="Латинские буквы, цифры, дефис или подчёркивание. Код нельзя изменить."
+              hint="Оставьте пустым для автоматической генерации. После создания код нельзя изменить."
             >
               {(id) => (
                 <Input

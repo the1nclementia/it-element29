@@ -104,7 +104,8 @@ def post(browser, command, items, *, employee=None, key=None, **fields):
         **fields,
     }
     if command == "issues":
-        data["recipient_employee_id"] = employee
+        if employee is not None:
+            data["recipient_employee_id"] = employee
     return browser.post(f"/api/v1/inventory/{command}", headers=headers(browser, key), json=data)
 
 
@@ -406,6 +407,28 @@ def test_history_snapshots_and_restore_archived_item(stock):
     )
     assert browser.get(f"/api/v1/inventory/items/{ids['items'][0]}").json()["archived_at"] is None
     assert balance(engine, ids["items"][0]) == 3
+
+
+def test_manual_recipient_issue_preserves_text_snapshots_without_employee(stock):
+    browser, engine, _, ids = stock
+    receive(stock, (ids["items"][0], 2))
+    response = post(
+        browser,
+        "issues",
+        [(ids["items"][0], 1)],
+        employee=None,
+        recipient_name="  Ручной получатель  ",
+        recipient_building=" Корпус А ",
+        recipient_department=" ИТ ",
+        recipient_room=" 305 ",
+    )
+    assert response.status_code == 201, response.text
+    document = response.json()
+    assert document["recipient_employee_id"] is None
+    assert document["recipient_name"] == "Ручной получатель"
+    assert document["recipient_building"] == "Корпус А"
+    assert document["recipient_department"] == "ИТ"
+    assert document["recipient_room"] == "305"
 
 
 def test_runtime_cannot_mutate_ledger_and_dashboard_uses_real_stock(stock):

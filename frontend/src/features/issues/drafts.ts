@@ -10,6 +10,9 @@ export interface ServerDraft {
     document_date?: string | null;
     comment?: string;
     recipient_employee_id?: string | null;
+    recipient_name?: string | null;
+    recipient_building?: string | null;
+    recipient_department?: string | null;
     receipt_purpose?: string;
     external_number?: string | null;
     supplier_name?: string | null;
@@ -36,6 +39,9 @@ export async function readDraft(draft: ServerDraft): Promise<Draft> {
     supplier: draft.payload.supplier_name ?? '',
     room: draft.payload.recipient_room ?? '',
     employee: draft.payload.recipient_employee_id ?? '',
+    recipientName: draft.payload.recipient_name ?? '',
+    recipientBuilding: draft.payload.recipient_building ?? '',
+    recipientDepartment: draft.payload.recipient_department ?? '',
     date: draft.payload.document_date ?? '',
     comment: draft.payload.comment ?? '',
     purpose: draft.payload.receipt_purpose ?? 'delivery',

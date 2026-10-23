@@ -116,6 +116,8 @@ beforeEach(() => {
           items: dashboardItems,
           total: dashboardItems.length,
         });
+      if (path.includes('/directory/employees'))
+        return Response.json({ items: [], total: 0 });
       if (path.includes('/users') && options?.method)
         return options.method === 'POST' && path.endsWith('reset-password')
           ? new Response(null, { status: 204 })
@@ -163,6 +165,88 @@ function app(path = '/') {
   return client;
 }
 describe('Авторизация и интерфейс', () => {
+  it('показывает состав, итог, автора и статус документа в истории', async () => {
+    dashboardDocuments = [
+      {
+        id: 'doc-summary',
+        number: 'INV-SUMMARY',
+        document_type: 'issue',
+        document_date: '2026-10-22',
+        created_at: '2026-10-22T10:00:00Z',
+        created_by_id: '1',
+        created_by_name: 'Автор операции',
+        recipient_employee_id: 'employee',
+        recipient_name: 'Получатель операции',
+        recipient_personnel_number: null,
+        recipient_department: 'Тестовый отдел',
+        recipient_room: '305',
+        recipient_building: null,
+        comment: null,
+        receipt_purpose: null,
+        external_number: null,
+        supplier_name: null,
+        reversal_of_id: null,
+        reason: null,
+        is_cancelled: false,
+        reversal_id: null,
+        reversal_number: null,
+        items: [1, 2, 3].map((n) => ({
+          id: `line-${n}`,
+          inventory_item_id: `item-${n}`,
+          internal_code: `CODE-${n}`,
+          model: `Модель ${n}`,
+          manufacturer: 'Производитель',
+          quantity: n,
+          delta: -n,
+          line_number: n,
+          unit: 'pcs',
+        })),
+      },
+    ];
+    app('/history');
+    await screen.findByRole('heading', { name: 'Складские документы' });
+    const row = (
+      await screen.findByRole('link', { name: 'INV-SUMMARY' })
+    ).closest('li')!;
+    expect(row).toHaveTextContent('Модель 1');
+    expect(row).toHaveTextContent('CODE-1');
+    expect(row).toHaveTextContent('1 шт.');
+    expect(row).toHaveTextContent('Модель 2');
+    expect(row).not.toHaveTextContent('Модель 3');
+    expect(row).toHaveTextContent('Ещё позиций: 1');
+    expect(row).toHaveTextContent('Позиций: 3 · Всего: 6 шт.');
+    expect(row).toHaveTextContent('Автор: Автор операции');
+    expect(row).toHaveTextContent('Получатель: Получатель операции');
+    expect(row).toHaveTextContent('Проведён');
+    expect(
+      within(row).getByRole('link', { name: /Подробнее/ }),
+    ).toHaveAttribute('href', '/inventory/documents/doc-summary');
+    const crumbs = within(
+      screen.getByRole('navigation', { name: 'Хлебные крошки' }),
+    );
+    await userEvent.click(crumbs.getByRole('link', { name: 'Обзор' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Добро пожаловать!' }),
+    ).toBeVisible();
+  });
+  it('даёт клавиатурные ссылки на склад и обзор из карточки', async () => {
+    app('/inventory/items/item-test');
+    const crumbs = within(
+      await screen.findByRole('navigation', { name: 'Хлебные крошки' }),
+    );
+    expect(crumbs.getByRole('link', { name: 'Обзор' })).toHaveAttribute(
+      'href',
+      '/',
+    );
+    expect(crumbs.getByRole('link', { name: 'Склад' })).toHaveAttribute(
+      'href',
+      '/inventory',
+    );
+    expect(crumbs.getByText('Номенклатура')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
   it('показывает и скрывает введённый пароль без отправки формы', async () => {
     currentUser = null;
     app('/login');
@@ -204,7 +288,7 @@ describe('Авторизация и интерфейс', () => {
       screen.queryByRole('link', { name: /Новое поступление/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: /Оформить выдачу/ }),
+      screen.queryByRole('link', { name: /Новая выдача/ }),
     ).not.toBeInTheDocument();
     expect(await screen.findByText('Документов пока нет')).toBeVisible();
     expect(await screen.findByText('Все остатки в норме')).toBeVisible();
@@ -221,9 +305,10 @@ describe('Авторизация и интерфейс', () => {
     expect(
       screen.getByRole('link', { name: /Новое поступление/ }),
     ).toHaveAttribute('href', '/inventory/receipt');
-    expect(
-      screen.getByRole('link', { name: /Оформить выдачу/ }),
-    ).toHaveAttribute('href', '/issues');
+    expect(screen.getByRole('link', { name: /Новая выдача/ })).toHaveAttribute(
+      'href',
+      '/issues',
+    );
   });
   it('показывает полученные документы и остатки со ссылками на карточки', async () => {
     dashboardDocuments = [
@@ -240,6 +325,7 @@ describe('Авторизация и интерфейс', () => {
         recipient_personnel_number: null,
         recipient_department: null,
         recipient_room: null,
+        recipient_building: null,
         supplier_name: null,
         comment: null,
         receipt_purpose: 'purchase',
@@ -267,8 +353,8 @@ describe('Авторизация и интерфейс', () => {
         model: 'Картридж 42',
         article: null,
         description: '',
-        min_stock: 3,
-        balance: 1,
+        min_stock: 0,
+        balance: 0,
         unit: 'pcs',
         is_low_stock: true,
         primary_photo_url: null,
@@ -280,8 +366,9 @@ describe('Авторизация и интерфейс', () => {
     expect(document).toHaveTextContent('Отменён');
     const item = await screen.findByRole('link', { name: /Тест Картридж 42/ });
     expect(item).toHaveAttribute('href', '/inventory/items/item-1');
-    expect(item).toHaveTextContent('Минимум 3 шт.');
-    expect(item).toHaveTextContent('1 шт.');
+    expect(item).toHaveTextContent('Минимум 0 шт.');
+    expect(item).toHaveTextContent('0 шт.');
+    expect(item).toHaveTextContent('Нет в наличии');
     expect(screen.getByRole('link', { name: /Показать все/ })).toHaveAttribute(
       'href',
       '/inventory?low_stock=true',
@@ -317,7 +404,9 @@ describe('Авторизация и интерфейс', () => {
       permissions: [...user.permissions, 'inventory.manage'],
     };
     app();
-    const navigation = within(await screen.findByRole('navigation'));
+    const navigation = within(
+      await screen.findByRole('navigation', { name: 'Основная навигация' }),
+    );
     expect(navigation.getByRole('link', { name: 'История' })).toHaveAttribute(
       'href',
       '/history',

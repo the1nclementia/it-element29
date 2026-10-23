@@ -22,6 +22,7 @@ from app.modules.inventory.models import (
     InventoryMovement,
     Manufacturer,
 )
+from app.modules.inventory.repository import is_low_stock
 
 MAX_EXPORT_ROWS = 10_000
 NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -131,7 +132,7 @@ def export_balances(session: Session, **filters) -> bytes:
             category,
             int(amount),
             item.min_stock,
-            "Да" if item.min_stock > 0 and amount < item.min_stock else "Нет",
+            "Да" if is_low_stock(int(amount), item.min_stock) else "Нет",
             "Да" if item.archived_at else "Нет",
         ]
         for item, amount, manufacturer, category in session.execute(query)
@@ -200,6 +201,7 @@ def export_movements(
             document.reason,
             document.supplier_name,
             document.recipient_room,
+            document.recipient_building,
         ]
         for movement, line, document, operator in session.execute(query)
     ]
@@ -221,6 +223,7 @@ def export_movements(
             "Причина отмены",
             "Поставщик (снимок)",
             "Кабинет (снимок)",
+            "Здание (снимок)",
         ],
         rows,
     )

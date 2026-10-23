@@ -40,6 +40,13 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
     ...(kind === 'issue'
       ? {
           recipient_employee_id: draft.employee || null,
+          ...(draft.employee
+            ? {}
+            : {
+                recipient_name: draft.recipientName || null,
+                recipient_building: draft.recipientBuilding || null,
+                recipient_department: draft.recipientDepartment || null,
+              }),
           recipient_room: draft.room || null,
         }
       : {
@@ -256,7 +263,6 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
                   {(id) => (
                     <Select
                       id={id}
-                      required
                       disabled={locked || !employees.data}
                       value={draft.employee}
                       onChange={(e) => update({ employee: e.target.value })}
@@ -273,16 +279,48 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
                 </Field>
                 <Field
                   label="Подразделение"
-                  hint="Определяется по выбранному сотруднику."
+                  hint="Определяется по сотруднику или вводится вручную."
                 >
                   {(id) => (
                     <Input
                       id={id}
-                      readOnly
+                      disabled={locked || !!draft.employee}
                       value={
                         employees.data?.find(
                           (employee) => employee.id === draft.employee,
-                        )?.department_name ?? ''
+                        )?.department_name ?? draft.recipientDepartment
+                      }
+                      onChange={(event) =>
+                        update({ recipientDepartment: event.target.value })
+                      }
+                    />
+                  )}
+                </Field>
+                <Field
+                  label="ФИО получателя"
+                  hint="Заполните, если сотрудника нет в справочнике."
+                >
+                  {(id) => (
+                    <Input
+                      id={id}
+                      maxLength={300}
+                      disabled={locked || !!draft.employee}
+                      value={draft.recipientName}
+                      onChange={(event) =>
+                        update({ recipientName: event.target.value })
+                      }
+                    />
+                  )}
+                </Field>
+                <Field label="Здание" hint="Необязательное поле.">
+                  {(id) => (
+                    <Input
+                      id={id}
+                      maxLength={200}
+                      disabled={locked}
+                      value={draft.recipientBuilding}
+                      onChange={(event) =>
+                        update({ recipientBuilding: event.target.value })
                       }
                     />
                   )}
@@ -410,7 +448,7 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
             {kind === 'issue'
               ? employees.data?.find(
                   (employee) => employee.id === draft.employee,
-                )?.full_name
+                )?.full_name || draft.recipientName
               : draft.purpose === 'opening_balance'
                 ? 'Начальный остаток'
                 : 'Поставка'}{' '}

@@ -86,7 +86,10 @@ export function ItemForm({
             method: item ? 'PATCH' : 'POST',
             body: item
               ? { ...fields, version: item.version }
-              : { ...fields, internal_code },
+              : {
+                  ...fields,
+                  ...(internal_code.trim() ? { internal_code } : {}),
+                },
           },
         ));
       setSaved(result);
@@ -199,10 +202,10 @@ export function ItemForm({
                 {(id) => (
                   <Input
                     id={id}
-                    required
                     maxLength={50}
                     disabled={locked || !!item}
                     value={form.internal_code}
+                    placeholder="Будет создан сервером"
                     onChange={(event) =>
                       setForm({
                         ...form,

@@ -205,7 +205,7 @@ it('сохраняет неполный личный черновик без п�
   expect(sent).toHaveLength(0);
   expect(screen.getByLabelText('Количество TEST-1')).toHaveValue(1);
 });
-it('сохраняет кабинет и показывает подразделение выбранного сотрудника только для чтения', async () => {
+it('сохраняет кабинет и блокирует ручное подразделение для выбранного сотрудника', async () => {
   app('/issues');
   const events = userEvent.setup();
   await screen.findByRole('button', { name: 'Добавить в корзину TEST-1' });
@@ -214,7 +214,8 @@ it('сохраняет кабинет и показывает подраздел
     'employee1',
   );
   expect(screen.getByLabelText('Подразделение')).toHaveValue('Отдел');
-  expect(screen.getByLabelText('Подразделение')).toHaveAttribute('readonly');
+  expect(screen.getByLabelText('Подразделение')).toBeDisabled();
+  await events.type(screen.getByLabelText('Здание'), 'Корпус А');
   await events.type(screen.getByLabelText('Кабинет'), '301');
   await events.click(
     screen.getByRole('button', { name: 'Добавить в корзину TEST-1' }),
@@ -226,6 +227,7 @@ it('сохраняет кабинет и показывает подраздел
   );
   await screen.findByText('INV-0001');
   expect(JSON.parse(String(sent[0].body))).toMatchObject({
+    recipient_building: 'Корпус А',
     recipient_room: '301',
   });
 });
