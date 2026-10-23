@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
+from app.modules.equipment.models import EquipmentInstance
 from app.modules.identity.dependencies import Database, require_permission
 from app.modules.identity.models import AuditLog, User
 from app.modules.inventory.models import (
@@ -77,6 +78,34 @@ def dashboard(
             InventoryItem.accounting_mode == "quantity",
         )
     )
+    equipment_total = session.scalar(
+        select(func.count())
+        .select_from(EquipmentInstance)
+        .where(EquipmentInstance.archived_at.is_(None))
+    )
+    equipment_maintenance = session.scalar(
+        select(func.count())
+        .select_from(EquipmentInstance)
+        .where(EquipmentInstance.archived_at.is_(None), EquipmentInstance.is_under_repair.is_(True))
+    )
+    equipment_active = session.scalar(
+        select(func.count())
+        .select_from(EquipmentInstance)
+        .where(
+            EquipmentInstance.archived_at.is_(None),
+            EquipmentInstance.is_under_repair.is_(False),
+            EquipmentInstance.current_recipient.is_not(None),
+        )
+    )
+    equipment_stock = session.scalar(
+        select(func.count())
+        .select_from(EquipmentInstance)
+        .where(
+            EquipmentInstance.archived_at.is_(None),
+            EquipmentInstance.is_under_repair.is_(False),
+            EquipmentInstance.current_recipient.is_(None),
+        )
+    )
     zone = ZoneInfo("Asia/Yekaterinburg")
     today = datetime.now(zone).date()
     start = datetime.combine(today, time.min, zone).astimezone(UTC)
@@ -100,6 +129,10 @@ def dashboard(
         )
     )
     values = {
+        "equipment_total": int(equipment_total),
+        "equipment_active": int(equipment_active),
+        "equipment_stock": int(equipment_stock),
+        "equipment_maintenance": int(equipment_maintenance),
         "cartridge_balance": int(cartridge_balance),
         "low_stock": low_stock,
         "issues_today": issues_today,

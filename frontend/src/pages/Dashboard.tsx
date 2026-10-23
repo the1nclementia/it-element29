@@ -5,10 +5,12 @@ import {
   ArrowUpRight,
   Boxes,
   ClipboardList,
+  Monitor,
   Package,
   PackagePlus,
   Plus,
   TriangleAlert,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -33,6 +35,10 @@ const icons: Record<string, LucideIcon> = {
   cartridge_balance: Package,
   issues_today: ArrowDownToLine,
   low_stock: TriangleAlert,
+  equipment_total: Monitor,
+  equipment_active: Monitor,
+  equipment_stock: Boxes,
+  equipment_maintenance: Wrench,
 };
 const actions = [
   {
@@ -171,7 +177,6 @@ export function Dashboard() {
         <div className="grid gap-4 sm:grid-cols-3">
           {query.data.metrics
             .filter((metric) => metric.key in icons && metric.available)
-            .slice(0, 3)
             .map((metric) => (
               <StatCard key={metric.key} metric={metric} />
             ))}

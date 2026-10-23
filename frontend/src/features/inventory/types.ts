@@ -45,6 +45,22 @@ export interface InventoryItem extends RecordEntry {
   unit: 'pcs';
   is_low_stock: boolean;
   primary_photo_url: string | null;
+  accounting_mode?: 'quantity' | 'serialized';
+  item_type?: 'cartridge' | 'consumable' | 'monitor' | 'computer' | 'printer';
+}
+export interface EquipmentInstance extends RecordEntry {
+  inventory_item_id: string;
+  internal_code: string;
+  model: string;
+  manufacturer_id: string;
+  manufacturer_name: string;
+  serial_number: string | null;
+  inventory_number: string | null;
+  current_building: string | null;
+  current_room: string | null;
+  current_department: string | null;
+  current_recipient: string | null;
+  is_under_repair: boolean;
 }
 export interface Photo {
   id: string;

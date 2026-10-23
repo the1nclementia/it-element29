@@ -438,7 +438,8 @@ def test_runtime_cannot_mutate_ledger_and_dashboard_uses_real_stock(stock):
     assert metrics["cartridge_balance"]["value"] == 11
     assert metrics["low_stock"]["value"] == 1
     assert metrics["issues_today"]["value"] == 0
-    assert metrics["equipment_total"]["value"] is None
+    assert metrics["equipment_total"]["value"] == 0
+    assert metrics["equipment_total"]["available"] is True
     with engine.connect() as connection:
         for table in [
             "inventory_documents",

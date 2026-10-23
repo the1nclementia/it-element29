@@ -127,3 +127,30 @@ def test_serialized_item_is_excluded_from_quantity_low_stock_and_documents(catal
     )
     assert receipt.status_code == 409
     assert receipt.json()["detail"]["code"] == "serialized_item_requires_instance_document"
+
+
+def test_dashboard_reports_current_equipment_state(catalog):
+    browser, _ = catalog
+    manufacturer, category = references(browser)
+    item = serialized_item(browser, manufacturer, category, "MONITOR-METRICS")
+    create(browser, "equipment/instances", {"inventory_item_id": item["id"]})
+    create(
+        browser,
+        "equipment/instances",
+        {"inventory_item_id": item["id"], "current_recipient": "Иванов И.И."},
+    )
+    create(
+        browser,
+        "equipment/instances",
+        {"inventory_item_id": item["id"], "is_under_repair": True},
+    )
+    metrics = {row["key"]: row for row in browser.get("/api/v1/dashboard").json()["metrics"]}
+    assert metrics["equipment_total"] == {
+        "key": "equipment_total",
+        "label": "Всего оборудования",
+        "value": 3,
+        "available": True,
+    }
+    assert metrics["equipment_stock"]["value"] == 1
+    assert metrics["equipment_active"]["value"] == 1
+    assert metrics["equipment_maintenance"]["value"] == 1
