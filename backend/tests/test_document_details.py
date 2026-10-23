@@ -153,3 +153,133 @@ def test_details_upgrade_preserves_existing_0004_document_and_draft(empty_databa
         )
         assert draft["payload"] == {"items": [], "comment": "Старый"}
         assert draft["version"] == 1 and draft["status"] == "draft"
+
+
+def test_equipment_upgrade_preserves_0005_documents_photos_and_drafts(empty_database):
+    """The 0007 extension must add equipment without rewriting stage-2 data."""
+    engine, _, config = empty_database
+    command.upgrade(config, "0005_inventory_document_details")
+    actor_id = uuid.uuid4()
+    manufacturer_id, item_id = uuid.uuid4(), uuid.uuid4()
+    document_id, document_item_id, movement_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    file_id, attachment_id, draft_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    with Session(engine) as session:
+        actor = bootstrap_admin(
+            session,
+            "migration_equipment",
+            "Синтетический оператор",
+            "Synthetic-migration-password-2026",
+        )
+        actor_id = actor.id
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO manufacturers (id, name, name_key) VALUES (:id, :name, :key)"),
+            {"id": manufacturer_id, "name": "Старый производитель", "key": "старый производитель"},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO inventory_items "
+                "(id, internal_code, category_id, manufacturer_id, model, min_stock) "
+                "VALUES (:id, 'LEGACY-MONITOR', "
+                "'00000000-0000-0000-0000-000000000029', :manufacturer, 'Старая модель', 0)"
+            ),
+            {"id": item_id, "manufacturer": manufacturer_id},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO inventory_documents "
+                "(id, number, document_type, document_date, created_by_id, "
+                "idempotency_key, request_hash, supplier_name) "
+                "VALUES (:id, 'INV-LEGACY-0005', 'receipt', '2026-10-22', "
+                ":actor, :key, :hash, 'Старый поставщик')"
+            ),
+            {"id": document_id, "actor": actor_id, "key": uuid.uuid4(), "hash": "b" * 64},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO inventory_document_items "
+                "(id, document_id, inventory_item_id, quantity, line_number, "
+                "internal_code, model, manufacturer) "
+                "VALUES (:id, :document, :item, 2, 1, 'LEGACY-MONITOR', "
+                "'Старая модель', 'Старый производитель')"
+            ),
+            {"id": document_item_id, "document": document_id, "item": item_id},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO inventory_movements (id, document_item_id, inventory_item_id, delta) "
+                "VALUES (:id, :document_item, :item, 2)"
+            ),
+            {"id": movement_id, "document_item": document_item_id, "item": item_id},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO file_attachments "
+                "(id, storage_key, mime_type, size, sha256, width, height, uploaded_by_id) "
+                "VALUES (:id, 'legacy/photo.png', 'image/png', 128, :sha, 16, 16, :actor)"
+            ),
+            {"id": file_id, "sha": "c" * 64, "actor": actor_id},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO inventory_item_attachments "
+                "(id, inventory_item_id, file_attachment_id, position, is_primary) "
+                "VALUES (:id, :item, :file, 0, true)"
+            ),
+            {"id": attachment_id, "item": item_id, "file": file_id},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO inventory_drafts (id, owner_id, document_type, payload) "
+                "VALUES (:id, :actor, 'receipt', CAST(:payload AS jsonb))"
+            ),
+            {
+                "id": draft_id,
+                "actor": actor_id,
+                "payload": (
+                    '{"items": [{"inventory_item_id": "LEGACY-MONITOR", '
+                    '"quantity": 1}], "comment": "Фото сохранено"}'
+                ),
+            },
+        )
+    command.upgrade(config, "head")
+    inspector = inspect(engine)
+    assert "equipment_instances" in inspector.get_table_names()
+    with engine.connect() as connection:
+        document = (
+            connection.execute(
+                text("SELECT number, supplier_name FROM inventory_documents WHERE id=:id"),
+                {"id": document_id},
+            )
+            .mappings()
+            .one()
+        )
+        assert document == {"number": "INV-LEGACY-0005", "supplier_name": "Старый поставщик"}
+        assert (
+            connection.scalar(
+                text("SELECT count(*) FROM inventory_movements WHERE id=:id"), {"id": movement_id}
+            )
+            == 1
+        )
+        assert (
+            connection.scalar(
+                text("SELECT count(*) FROM inventory_item_attachments WHERE id=:id"),
+                {"id": attachment_id},
+            )
+            == 1
+        )
+        assert (
+            connection.scalar(
+                text("SELECT status FROM inventory_drafts WHERE id=:id"), {"id": draft_id}
+            )
+            == "draft"
+        )
+        item = (
+            connection.execute(
+                text("SELECT accounting_mode, item_type FROM inventory_items WHERE id=:id"),
+                {"id": item_id},
+            )
+            .mappings()
+            .one()
+        )
+        assert item == {"accounting_mode": "quantity", "item_type": "cartridge"}
