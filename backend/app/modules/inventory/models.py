@@ -114,7 +114,10 @@ class InventoryDocument(Base):
     __tablename__ = "inventory_documents"
     __table_args__ = (
         UniqueConstraint("created_by_id", "document_type", "idempotency_key"),
-        CheckConstraint("document_type IN ('receipt','issue','reversal')", name="valid_type"),
+        CheckConstraint(
+            "document_type IN ('receipt','issue','reversal','return','replacement','transfer')",
+            name="valid_type",
+        ),
         CheckConstraint(
             "receipt_purpose IS NULL OR receipt_purpose IN ('delivery','opening_balance')",
             name="valid_receipt_purpose",

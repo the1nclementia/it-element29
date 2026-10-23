@@ -7,7 +7,10 @@ from app.modules.directory import models  # noqa: F401
 from app.modules.equipment import models as equipment_models  # noqa: F401
 from app.modules.files import models as files_models  # noqa: F401
 from app.modules.identity import models as identity_models  # noqa: F401
-from app.modules.inventory import draft_models  # noqa: F401
+from app.modules.inventory import (
+    draft_models,  # noqa: F401
+    equipment_document_models,  # noqa: F401
+)
 from app.modules.inventory import models as inventory_models  # noqa: F401
 
 target_metadata = Base.metadata

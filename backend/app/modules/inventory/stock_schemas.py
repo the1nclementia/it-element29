@@ -56,3 +56,36 @@ class IssueInput(DocumentInput):
 
 class ReversalInput(StockInput):
     reason: str = Field(min_length=1, max_length=1000)
+
+
+class EquipmentDocumentLineInput(StockInput):
+    equipment_instance_id: uuid.UUID
+
+
+class MixedDocumentInput(StockInput):
+    document_date: date
+    comment: str = Field(default="", max_length=2000)
+    items: list[DocumentLineInput] = Field(default_factory=list, max_length=100)
+    equipment_instances: list[EquipmentDocumentLineInput] = Field(
+        default_factory=list, max_length=100
+    )
+
+    @field_validator("items")
+    @classmethod
+    def unique_items(cls, values):
+        if len({line.inventory_item_id for line in values}) != len(values):
+            raise ValueError("Позиция не может повторяться в одном документе.")
+        return values
+
+    @field_validator("equipment_instances")
+    @classmethod
+    def unique_equipment(cls, values):
+        if len({line.equipment_instance_id for line in values}) != len(values):
+            raise ValueError("Экземпляр не может повторяться в одном документе.")
+        return values
+
+    @model_validator(mode="after")
+    def require_line(self):
+        if not self.items and not self.equipment_instances:
+            raise ValueError("Документ должен содержать хотя бы одну строку.")
+        return self

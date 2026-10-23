@@ -12,7 +12,10 @@ from app.db.base import Base, RecordMixin
 class InventoryDraft(RecordMixin, Base):
     __tablename__ = "inventory_drafts"
     __table_args__ = (
-        CheckConstraint("document_type IN ('receipt', 'issue')", name="valid_type"),
+        CheckConstraint(
+            "document_type IN ('receipt', 'issue', 'return', 'replacement', 'transfer')",
+            name="valid_type",
+        ),
         CheckConstraint("status IN ('draft', 'posted', 'archived')", name="valid_status"),
         CheckConstraint("version > 0", name="positive_version"),
         CheckConstraint("jsonb_typeof(payload) = 'object'", name="object_payload"),

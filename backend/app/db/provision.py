@@ -90,6 +90,8 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
                 "inventory_documents",
                 "inventory_document_items",
                 "inventory_movements",
+                "equipment_movements",
+                "inventory_document_equipment",
                 "file_attachments",
             ],
         ),

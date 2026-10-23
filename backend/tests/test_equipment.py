@@ -81,7 +81,8 @@ def test_equipment_instance_identifiers_are_scoped_and_optional(catalog):
             "inventory_number": " inv-dup ",
         },
     )
-    assert duplicate_inventory.status_code == 409
+    assert duplicate_inventory.status_code == 201
+    assert duplicate_inventory.json()["inventory_number"] == "inv-dup"
     duplicate_serial = browser.post(
         "/api/v1/equipment/instances",
         headers=headers(browser),
@@ -92,9 +93,15 @@ def test_equipment_instance_identifiers_are_scoped_and_optional(catalog):
         },
     )
     assert duplicate_serial.status_code == 409
+    assert duplicate_serial.json()["detail"]["code"] == "duplicate_serial_number"
     empty_numbers = create(browser, "equipment/instances", {"inventory_item_id": item["id"]})
     assert empty_numbers["serial_number"] is None
     assert empty_numbers["inventory_number"] is None
+    assert empty_numbers["identification_warning"]
+
+    matches = browser.get("/api/v1/equipment/instances", params={"q": "INV-DUP"}).json()
+    assert matches["total"] == 2
+    assert {row["serial_number"] for row in matches["items"]} == {"SN-DUP", "SN-OTHER"}
 
 
 def test_quantity_item_cannot_register_equipment(catalog):

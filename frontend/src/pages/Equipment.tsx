@@ -111,6 +111,11 @@ export function Equipment() {
                       <p className="mt-1 text-xs text-muted">
                         {row.internal_code}
                       </p>
+                      {row.identification_warning && (
+                        <p className="mt-2 text-xs text-orange-700">
+                          {row.identification_warning}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-4">{row.serial_number ?? '—'}</td>
                     <td className="px-5 py-4">{row.inventory_number ?? '—'}</td>
@@ -148,6 +153,11 @@ export function Equipment() {
                     <p className="mt-1 text-xs text-muted">
                       {row.internal_code}
                     </p>
+                    {row.identification_warning && (
+                      <p className="mt-2 text-xs text-orange-700">
+                        {row.identification_warning}
+                      </p>
+                    )}
                   </div>
                   <StatusBadge active={!row.is_under_repair}>
                     {row.is_under_repair

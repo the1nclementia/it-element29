@@ -55,6 +55,7 @@ export interface EquipmentInstance extends RecordEntry {
   manufacturer_id: string;
   manufacturer_name: string;
   serial_number: string | null;
+  identification_warning: string | null;
   inventory_number: string | null;
   current_building: string | null;
   current_room: string | null;

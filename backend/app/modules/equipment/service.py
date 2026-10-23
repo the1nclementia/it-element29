@@ -30,6 +30,11 @@ def response(session: Session, instance: EquipmentInstance) -> dict:
         "manufacturer_id": instance.manufacturer_id,
         "manufacturer_name": manufacturer.name,
         "serial_number": instance.serial_number,
+        "identification_warning": (
+            "Серийный номер отсутствует; надёжная идентификация по внешним номерам невозможна."
+            if instance.serial_number is None
+            else None
+        ),
         "inventory_number": instance.inventory_number,
         "current_building": instance.current_building,
         "current_room": instance.current_room,
@@ -50,6 +55,7 @@ def list_instances(
     if inventory_item_id:
         query = query.where(EquipmentInstance.inventory_item_id == inventory_item_id)
     if q:
+        q = " ".join(q.split())
         pattern = f"%{q.replace('%', r'\\%').replace('_', r'\\_')}%"
         query = query.where(
             or_(
@@ -94,7 +100,11 @@ def create(session: Session, actor, session_hash: str, payload) -> dict:
         session.flush()
     except IntegrityError:
         session.rollback()
-        fail(409, "duplicate_identifier", "Серийный или инвентарный номер уже зарегистрирован.")
+        fail(
+            409,
+            "duplicate_serial_number",
+            "Серийный номер этого производителя уже зарегистрирован.",
+        )
     audit(
         session,
         actor.id,
@@ -130,7 +140,11 @@ def update(session: Session, actor, session_hash: str, instance_id: uuid.UUID, p
         session.flush()
     except IntegrityError:
         session.rollback()
-        fail(409, "duplicate_identifier", "Серийный или инвентарный номер уже зарегистрирован.")
+        fail(
+            409,
+            "duplicate_serial_number",
+            "Серийный номер этого производителя уже зарегистрирован.",
+        )
     audit(session, actor.id, "equipment.instance_updated", instance.id, {"fields": list(values)})
     session.commit()
     return response(session, instance)
