@@ -225,6 +225,12 @@ def conduct(
     revalidate_mutation(session, actor, session_hash, permission)
     if any(item.archived_at for item in items.values()):
         fail(409, "item_archived", "Архивную позицию нельзя использовать в новом документе.")
+    if any(item.accounting_mode != "quantity" for item in items.values()):
+        fail(
+            409,
+            "serialized_item_requires_instance_document",
+            "Поэкземплярные позиции проводятся отдельной операцией с физическими экземплярами.",
+        )
     deltas = {
         line.inventory_item_id: line.quantity * (-1 if issue else 1) for line in payload.items
     }

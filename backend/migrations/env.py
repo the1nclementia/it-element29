@@ -4,6 +4,7 @@ from app.core.config import Settings
 from app.db.base import Base
 from app.db.session import build_engine
 from app.modules.directory import models  # noqa: F401
+from app.modules.equipment import models as equipment_models  # noqa: F401
 from app.modules.files import models as files_models  # noqa: F401
 from app.modules.identity import models as identity_models  # noqa: F401
 from app.modules.inventory import draft_models  # noqa: F401

@@ -66,11 +66,15 @@ def dashboard(
     cartridge_balance = session.scalar(
         active.with_only_columns(func.coalesce(func.sum(quantity), 0))
         .join(InventoryCategory, InventoryCategory.id == InventoryItem.category_id)
-        .where(InventoryCategory.code == "cartridges")
+        .where(
+            InventoryCategory.code == "cartridges",
+            InventoryItem.accounting_mode == "quantity",
+        )
     )
     low_stock = session.scalar(
         active.with_only_columns(func.count(InventoryItem.id)).where(
             low_stock_expression(quantity, InventoryItem.min_stock),
+            InventoryItem.accounting_mode == "quantity",
         )
     )
     zone = ZoneInfo("Asia/Yekaterinburg")

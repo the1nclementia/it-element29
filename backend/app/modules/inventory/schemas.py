@@ -1,6 +1,6 @@
 import re
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
 
@@ -72,6 +72,18 @@ class ItemFields(CatalogInput):
     article: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
     description: str = Field(default="", max_length=5000)
     min_stock: int = Field(default=0, strict=True, ge=0, le=9_007_199_254_740_991)
+    accounting_mode: Literal["quantity", "serialized"] = "quantity"
+    item_type: Literal["cartridge", "consumable", "monitor", "computer", "printer"] = "cartridge"
+
+    @model_validator(mode="after")
+    def serialized_has_equipment_type(self):
+        if self.accounting_mode == "serialized" and self.item_type not in {
+            "monitor",
+            "computer",
+            "printer",
+        }:
+            raise ValueError("Для поэкземплярного учёта выберите тип оборудования.")
+        return self
 
 
 class ItemCreate(ItemFields):
@@ -90,6 +102,14 @@ class ItemPatch(VersionInput):
     article: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
     description: str | None = Field(default=None, max_length=5000)
     min_stock: int | None = Field(default=None, strict=True, ge=0, le=9_007_199_254_740_991)
+    accounting_mode: Literal["quantity", "serialized"] | None = None
+    item_type: Literal["cartridge", "consumable", "monitor", "computer", "printer"] | None = None
+
+    @model_validator(mode="after")
+    def validate_serialized_type(self):
+        if self.accounting_mode == "serialized" and self.item_type in {"cartridge", "consumable"}:
+            raise ValueError("Для поэкземплярного учёта выберите тип оборудования.")
+        return self
 
 
 class CompatibilitiesInput(VersionInput):

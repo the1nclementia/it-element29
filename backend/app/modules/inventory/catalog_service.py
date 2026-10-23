@@ -115,13 +115,16 @@ def item_response(session: Session, item: InventoryItem, balance: int | None = N
                 "article",
                 "description",
                 "min_stock",
+                "accounting_mode",
+                "item_type",
             )
         },
         "category_name": session.get(InventoryCategory, item.category_id).name,
         "manufacturer_name": session.get(Manufacturer, item.manufacturer_id).name,
         "balance": balance,
         "unit": "pcs",
-        "is_low_stock": is_low_stock(balance, item.min_stock),
+        "is_low_stock": item.accounting_mode == "quantity"
+        and is_low_stock(balance, item.min_stock),
         "primary_photo_url": f"/api/v1/inventory/items/{item.id}/photos/{photo_id}/content"
         if photo_id
         else None,
@@ -290,7 +293,9 @@ def item_query(
     if in_stock is not None:
         statement = statement.where((amount > 0) if in_stock else (amount == 0))
     if low_stock is not None:
-        low = low_stock_expression(amount, InventoryItem.min_stock)
+        low = low_stock_expression(amount, InventoryItem.min_stock) & (
+            InventoryItem.accounting_mode == "quantity"
+        )
         statement = statement.where(low if low_stock else ~low)
     order = {"code": InventoryItem.internal_code, "model": InventoryItem.model, "balance": amount}[
         sort
@@ -342,6 +347,21 @@ def save_item(session: Session, actor, session_hash, payload, item_id=None):
         check_version(item, version)
         if item.archived_at is not None:
             fail(409, "record_archived", "Сначала восстановите позицию из архива.")
+        if (
+            item.accounting_mode == "serialized"
+            and "manufacturer_id" in values
+            and values["manufacturer_id"] != item.manufacturer_id
+        ):
+            from app.modules.equipment.models import EquipmentInstance
+
+            if session.scalar(
+                select(EquipmentInstance.id).where(EquipmentInstance.inventory_item_id == item.id)
+            ):
+                fail(
+                    409,
+                    "manufacturer_locked",
+                    "Производителя нельзя менять после регистрации экземпляров.",
+                )
     revalidate_mutation(session, actor, session_hash, "inventory.manage")
     if item is None:
         if values.get("internal_code") is None:
@@ -355,6 +375,16 @@ def save_item(session: Session, actor, session_hash, payload, item_id=None):
         item = InventoryItem(**values)
         session.add(item)
     else:
+        if "accounting_mode" in values and values["accounting_mode"] != item.accounting_mode:
+            fail(409, "accounting_mode_locked", "Режим учёта нельзя менять после создания позиции.")
+        if "item_type" in values and values["item_type"] != item.item_type:
+            fail(409, "item_type_locked", "Вид номенклатуры нельзя менять после создания позиции.")
+        target_mode = values.get("accounting_mode", item.accounting_mode)
+        target_type = values.get("item_type", item.item_type)
+        if target_mode == "serialized" and target_type in {"cartridge", "consumable"}:
+            fail(
+                422, "invalid_accounting_type", "Для поэкземплярного учёта нужен тип оборудования."
+            )
         for name, value in values.items():
             setattr(item, name, value)
         item.version += 1

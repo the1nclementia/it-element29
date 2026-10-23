@@ -60,6 +60,8 @@ def audit(
             "article",
             "description",
             "min_stock",
+            "accounting_mode",
+            "item_type",
         }
         fields = changes.get("fields")
         if isinstance(fields, list):
@@ -75,6 +77,24 @@ def audit(
                         safe["printer_model_ids"].append(str(uuid.UUID(value)))
                     except ValueError:
                         continue
+    if action.startswith("equipment.") and changes:
+        fields = changes.get("fields")
+        if isinstance(fields, list):
+            safe["fields"] = [
+                field
+                for field in fields
+                if isinstance(field, str)
+                and field
+                in {
+                    "serial_number",
+                    "inventory_number",
+                    "current_building",
+                    "current_room",
+                    "current_department",
+                    "current_recipient",
+                    "is_under_repair",
+                }
+            ]
     session.add(AuditLog(actor_id=actor_id, action=action, target_id=target_id, changes=safe))
 
 

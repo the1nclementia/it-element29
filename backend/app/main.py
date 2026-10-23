@@ -11,6 +11,7 @@ from app.core.config import PROJECT_ROOT, Settings
 from app.db.session import build_engine
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.directory.router import router as directory_router
+from app.modules.equipment.router import router as equipment_router
 from app.modules.files.middleware import PhotoBodyLimitMiddleware
 from app.modules.files.router import router as files_router
 from app.modules.health.router import router as health_router
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(identity_router, prefix="/api/v1")
     app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(stock_router, prefix="/api/v1")
+    app.include_router(equipment_router, prefix="/api/v1")
     app.include_router(inventory_router, prefix="/api/v1")
     app.include_router(export_router, prefix="/api/v1")
     app.include_router(draft_router, prefix="/api/v1")

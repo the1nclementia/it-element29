@@ -132,7 +132,9 @@ def export_balances(session: Session, **filters) -> bytes:
             category,
             int(amount),
             item.min_stock,
-            "Да" if is_low_stock(int(amount), item.min_stock) else "Нет",
+            "Да"
+            if item.accounting_mode == "quantity" and is_low_stock(int(amount), item.min_stock)
+            else "Нет",
             "Да" if item.archived_at else "Нет",
         ]
         for item, amount, manufacturer, category in session.execute(query)

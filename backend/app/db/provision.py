@@ -76,6 +76,7 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
                 "inventory_categories",
                 "printer_models",
                 "inventory_items",
+                "equipment_instances",
                 "inventory_compatibilities",
                 "inventory_item_attachments",
                 "inventory_drafts",
