@@ -28,7 +28,8 @@ def test_inventory_schema_and_additive_upgrade(empty_database):
         )
         connection.execute(
             text(
-                "INSERT INTO employees(id,personnel_number,full_name,department_id) VALUES (:id,:number,:name,:department)"
+                "INSERT INTO employees(id,personnel_number,full_name,department_id) "
+                "VALUES (:id,:number,:name,:department)"
             ),
             {
                 "id": employee_id,
@@ -39,7 +40,8 @@ def test_inventory_schema_and_additive_upgrade(empty_database):
         )
         connection.execute(
             text(
-                "INSERT INTO locations(id,code,name,department_id) VALUES (:id,:code,:name,:department)"
+                "INSERT INTO locations(id,code,name,department_id) "
+                "VALUES (:id,:code,:name,:department)"
             ),
             {
                 "id": location_id,
@@ -54,9 +56,7 @@ def test_inventory_schema_and_additive_upgrade(empty_database):
 
         admin_id = admin.id
         password_hash = session.get(User, admin_id).password_hash
-        original_audit = session.scalar(
-            select(AuditLog).where(AuditLog.action == "user.bootstrap")
-        )
+        original_audit = session.scalar(select(AuditLog).where(AuditLog.action == "user.bootstrap"))
         audit_id, audit_time = original_audit.id, original_audit.occurred_at
 
     command.upgrade(config, "head")
@@ -453,6 +453,11 @@ def test_runtime_grants_for_stage3_are_minimal(catalog):
             text("SELECT has_sequence_privilege(:role,'inventory_document_number_seq','USAGE')"),
             {"role": role},
         )
+        for sequence in ("inventory_category_code_seq", "inventory_item_code_seq"):
+            assert connection.scalar(
+                text("SELECT has_sequence_privilege(:role,:sequence,'USAGE')"),
+                {"role": role, "sequence": sequence},
+            )
         assert not connection.scalar(
             text("SELECT has_schema_privilege(:role,'public','CREATE')"), {"role": role}
         )
@@ -494,9 +499,12 @@ def test_category_names_are_unique_across_case_whitespace_edits_and_archive(cata
     )
     assert duplicate.status_code == 409, duplicate.text
     assert client.get("/api/v1/inventory/categories", params={"q": "USB"}).json()["total"] == 0
-    assert client.get(
-        "/api/v1/inventory/categories", params={"q": "USB", "archived": "all"}
-    ).json()["total"] == 1
+    assert (
+        client.get("/api/v1/inventory/categories", params={"q": "USB", "archived": "all"}).json()[
+            "total"
+        ]
+        == 1
+    )
 
 
 def test_concurrent_category_names_cannot_create_duplicates(catalog):
@@ -507,10 +515,64 @@ def test_concurrent_category_names_cannot_create_duplicates(catalog):
         return client.post("/api/v1/inventory/categories", headers=auth, json=entry)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(create_category, [
-            {"code": "cables-a", "name": "USB Кабели"},
-            {"code": "cables-b", "name": "usb   КАБЕЛИ"},
-        ]))
+        results = list(
+            pool.map(
+                create_category,
+                [
+                    {"code": "cables-a", "name": "USB Кабели"},
+                    {"code": "cables-b", "name": "usb   КАБЕЛИ"},
+                ],
+            )
+        )
     assert sorted(result.status_code for result in results) == [201, 409], [
         result.text for result in results
     ]
+
+
+def test_server_generates_stable_codes_without_changing_explicit_codes(catalog):
+    client, _ = catalog
+    manufacturer, category = references(client)
+    generated_category = create(client, "inventory/categories", {"name": "Автокоды"})
+    assert generated_category["code"].startswith("CAT-")
+    renamed_category = client.patch(
+        "/api/v1/inventory/categories/" + generated_category["id"],
+        headers=headers(client),
+        json={"version": 1, "name": "Переименованные автокоды"},
+    )
+    assert renamed_category.status_code == 200
+    assert renamed_category.json()["code"] == generated_category["code"]
+    generated_item = create(
+        client,
+        "inventory/items",
+        {
+            "manufacturer_id": manufacturer["id"],
+            "category_id": generated_category["id"],
+            "model": "Картридж",
+        },
+    )
+    assert generated_item["internal_code"].startswith("ITEM-")
+    updated = client.patch(
+        "/api/v1/inventory/items/" + generated_item["id"],
+        headers=headers(client),
+        json={"version": 1, "model": "Новая модель"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["internal_code"] == generated_item["internal_code"]
+
+    explicit_category = create(
+        client,
+        "inventory/categories",
+        {"code": "legacy-category", "name": "Старый код категории"},
+    )
+    explicit_item = create(
+        client,
+        "inventory/items",
+        {
+            "internal_code": "legacy-item",
+            "manufacturer_id": manufacturer["id"],
+            "category_id": explicit_category["id"],
+            "model": "Существующий код",
+        },
+    )
+    assert explicit_category["code"] == "legacy-category"
+    assert explicit_item["internal_code"] == "LEGACY-ITEM"

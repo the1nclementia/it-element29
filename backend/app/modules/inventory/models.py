@@ -20,6 +20,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, RecordMixin
 
 inventory_document_number_seq = Sequence("inventory_document_number_seq", metadata=Base.metadata)
+inventory_category_code_seq = Sequence("inventory_category_code_seq", metadata=Base.metadata)
+inventory_item_code_seq = Sequence("inventory_item_code_seq", metadata=Base.metadata)
 
 
 class Manufacturer(RecordMixin, Base):
@@ -59,6 +61,17 @@ class InventoryItem(RecordMixin, Base):
     __tablename__ = "inventory_items"
     __table_args__ = (
         CheckConstraint("min_stock >= 0 AND min_stock <= 9007199254740991", name="valid_min_stock"),
+        CheckConstraint(
+            "accounting_mode IN ('quantity', 'serialized')", name="valid_accounting_mode"
+        ),
+        CheckConstraint(
+            "item_type IN ('cartridge', 'consumable', 'monitor', 'computer', 'printer')",
+            name="valid_item_type",
+        ),
+        CheckConstraint(
+            "accounting_mode <> 'serialized' OR item_type IN ('monitor', 'computer', 'printer')",
+            name="serialized_equipment_type",
+        ),
         CheckConstraint("length(btrim(internal_code)) > 0", name="code_not_blank"),
         CheckConstraint("length(btrim(model)) > 0", name="model_not_blank"),
         Index("ix_inventory_items_archived_at_internal_code", "archived_at", "internal_code"),
@@ -75,6 +88,12 @@ class InventoryItem(RecordMixin, Base):
     article: Mapped[str | None] = mapped_column(String(100))
     description: Mapped[str] = mapped_column(Text, default="", server_default="")
     min_stock: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    accounting_mode: Mapped[str] = mapped_column(
+        String(20), default="quantity", server_default="quantity"
+    )
+    item_type: Mapped[str] = mapped_column(
+        String(30), default="cartridge", server_default="cartridge"
+    )
     version: Mapped[int] = mapped_column(default=1, server_default="1")
 
 
@@ -95,7 +114,10 @@ class InventoryDocument(Base):
     __tablename__ = "inventory_documents"
     __table_args__ = (
         UniqueConstraint("created_by_id", "document_type", "idempotency_key"),
-        CheckConstraint("document_type IN ('receipt','issue','reversal')", name="valid_type"),
+        CheckConstraint(
+            "document_type IN ('receipt','issue','reversal','return','replacement','transfer')",
+            name="valid_type",
+        ),
         CheckConstraint(
             "receipt_purpose IS NULL OR receipt_purpose IN ('delivery','opening_balance')",
             name="valid_receipt_purpose",
@@ -114,11 +136,14 @@ class InventoryDocument(Base):
         ForeignKey("employees.id", ondelete="RESTRICT"), index=True
     )
     recipient_name: Mapped[str | None] = mapped_column(String(300))
+    recipient_building: Mapped[str | None] = mapped_column(String(200))
     recipient_personnel_number: Mapped[str | None] = mapped_column(String(50))
     recipient_department: Mapped[str | None] = mapped_column(String(200))
+    recipient_room: Mapped[str | None] = mapped_column(String(100))
     comment: Mapped[str] = mapped_column(Text, default="", server_default="")
     receipt_purpose: Mapped[str | None] = mapped_column(String(30))
     external_number: Mapped[str | None] = mapped_column(String(100))
+    supplier_name: Mapped[str | None] = mapped_column(String(200))
     reversal_of_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("inventory_documents.id", ondelete="RESTRICT"), unique=True
     )

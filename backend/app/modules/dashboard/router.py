@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
+from app.modules.equipment.models import EquipmentInstance
 from app.modules.identity.dependencies import Database, require_permission
 from app.modules.identity.models import AuditLog, User
 from app.modules.inventory.models import (
@@ -14,6 +15,7 @@ from app.modules.inventory.models import (
     InventoryItem,
     InventoryMovement,
 )
+from app.modules.inventory.repository import low_stock_expression
 
 router = APIRouter(tags=["Главная"])
 METRICS = [
@@ -65,12 +67,43 @@ def dashboard(
     cartridge_balance = session.scalar(
         active.with_only_columns(func.coalesce(func.sum(quantity), 0))
         .join(InventoryCategory, InventoryCategory.id == InventoryItem.category_id)
-        .where(InventoryCategory.code == "cartridges")
+        .where(
+            InventoryCategory.code == "cartridges",
+            InventoryItem.accounting_mode == "quantity",
+        )
     )
     low_stock = session.scalar(
         active.with_only_columns(func.count(InventoryItem.id)).where(
-            InventoryItem.min_stock > 0,
-            quantity < InventoryItem.min_stock,
+            low_stock_expression(quantity, InventoryItem.min_stock),
+            InventoryItem.accounting_mode == "quantity",
+        )
+    )
+    equipment_total = session.scalar(
+        select(func.count())
+        .select_from(EquipmentInstance)
+        .where(EquipmentInstance.archived_at.is_(None))
+    )
+    equipment_maintenance = session.scalar(
+        select(func.count())
+        .select_from(EquipmentInstance)
+        .where(EquipmentInstance.archived_at.is_(None), EquipmentInstance.is_under_repair.is_(True))
+    )
+    equipment_active = session.scalar(
+        select(func.count())
+        .select_from(EquipmentInstance)
+        .where(
+            EquipmentInstance.archived_at.is_(None),
+            EquipmentInstance.is_under_repair.is_(False),
+            EquipmentInstance.current_recipient.is_not(None),
+        )
+    )
+    equipment_stock = session.scalar(
+        select(func.count())
+        .select_from(EquipmentInstance)
+        .where(
+            EquipmentInstance.archived_at.is_(None),
+            EquipmentInstance.is_under_repair.is_(False),
+            EquipmentInstance.current_recipient.is_(None),
         )
     )
     zone = ZoneInfo("Asia/Yekaterinburg")
@@ -96,6 +129,10 @@ def dashboard(
         )
     )
     values = {
+        "equipment_total": int(equipment_total),
+        "equipment_active": int(equipment_active),
+        "equipment_stock": int(equipment_stock),
+        "equipment_maintenance": int(equipment_maintenance),
         "cartridge_balance": int(cartridge_balance),
         "low_stock": low_stock,
         "issues_today": issues_today,

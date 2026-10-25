@@ -13,6 +13,9 @@ import { Brand } from '../components/layout';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Field, Notice } from '../components/common';
+import { LoginHeroErrorBoundary } from '../components/LoginHeroErrorBoundary';
+import { LoginHeroBackdrop } from '../components/LoginHeroBackdrop';
+
 export function Login() {
   const { user, login } = useAuth();
   const [pending, setPending] = useState(false);
@@ -38,42 +41,42 @@ export function Login() {
     }
   }
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
-      <section className="relative hidden overflow-hidden bg-[#172b4d] px-16 py-12 text-white lg:flex lg:flex-col">
-        <div className="absolute inset-0 login-pattern" />
-        <div className="absolute -bottom-64 -left-52 size-[650px] rounded-full border border-white/10" />
-        <div className="absolute -bottom-40 -left-28 size-[450px] rounded-full border border-white/10" />
+    <div className="grid min-h-dvh lg:grid-cols-[1.55fr_1fr]">
+      <section className="login-hero relative hidden overflow-hidden px-16 py-12 text-foreground lg:flex lg:flex-col">
+        <LoginHeroErrorBoundary onFallback={() => undefined}>
+          <LoginHeroBackdrop />
+        </LoginHeroErrorBoundary>
         <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-blue-100">
-            <span className="size-1.5 rounded-full bg-orange-400" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-white/70 px-3 py-1.5 text-xs text-foreground shadow-sm backdrop-blur">
+            <span className="size-1.5 rounded-full bg-primary" />
             Корпоративная система учёта
           </span>
         </div>
-        <div className="relative my-auto max-w-lg py-20">
-          <div className="mb-8 flex size-14 items-center justify-center rounded-2xl border border-white/15 bg-white/5">
-            <Layers3 className="size-7 text-blue-200" strokeWidth={1.5} />
+        <div className="login-hero-copy relative my-auto max-w-lg py-20">
+          <div className="mb-8 flex size-14 items-center justify-center rounded-2xl border border-white/80 bg-white/85 shadow-sm">
+            <Layers3 className="size-7 text-primary" strokeWidth={1.5} />
           </div>
           <h1 className="text-[44px] font-semibold leading-[1.2] tracking-tight">
             Ваши ИТ-ресурсы.
             <br />
-            <span className="text-blue-300">Всё на своих местах.</span>
+            <span className="text-primary">Всё на своих местах.</span>
           </h1>
-          <p className="mt-6 max-w-sm text-base leading-7 text-slate-300">
+          <p className="mt-6 max-w-sm text-base leading-7 text-muted">
             Единое пространство для команды: оборудование, расходные материалы и
             управление доступом.
           </p>
-          <div className="mt-10 h-1 w-12 rounded-full bg-orange-400" />
+          <div className="login-hero-accent mt-10 h-1 w-12 rounded-full" />
         </div>
-        <p className="relative text-xs text-slate-400">
+        <p className="relative text-xs text-muted">
           ИТ-элемент [29] · Для внутреннего использования
         </p>
       </section>
-      <section className="flex flex-col bg-white px-6 py-10 sm:px-12">
+      <section className="login-form-panel relative flex flex-col bg-white px-6 py-10 sm:px-12">
         <div className="mx-auto w-full max-w-sm">
           <Brand />
         </div>
         <div className="mx-auto my-auto w-full max-w-sm py-16">
-          <div className="mb-6 flex size-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
+          <div className="mb-6 flex size-11 items-center justify-center rounded-xl bg-primary-light text-primary">
             <LockKeyhole className="size-5" />
           </div>
           <h2 className="text-3xl font-semibold tracking-tight">

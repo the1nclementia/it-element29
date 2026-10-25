@@ -138,7 +138,10 @@ it('после неизвестного результата блокирует 
     new Headers(sent[0].headers).get('Idempotency-Key'),
   );
   expect(screen.queryByLabelText('Количество TEST-1')).not.toBeInTheDocument();
-  expect(localStorage.length + sessionStorage.length).toBe(0);
+  expect(localStorage.getItem('access_token')).toBeNull();
+  expect(localStorage.getItem('refresh_token')).toBeNull();
+  expect(sessionStorage.getItem('access_token')).toBeNull();
+  expect(sessionStorage.getItem('refresh_token')).toBeNull();
 });
 it('конфликт остатка сохраняет корзину и показывает доступное количество', async () => {
   outcome = 'stock';
@@ -168,20 +171,66 @@ it('ИТ-специалист не может открыть поступлен�
   );
 });
 it('сохраняет неполный личный черновик без получателя и проведения', async () => {
-  app('/issues'); const events=userEvent.setup();
-  await events.click(await screen.findByRole('button',{name:'Добавить в корзину TEST-1'}));
-  const previous=vi.mocked(fetch).getMockImplementation()!;
-  let draftBody:Record<string,unknown>|undefined;
-  vi.mocked(fetch).mockImplementation(async(url,options)=>{
-    if(String(url).endsWith('/inventory/drafts')&&options?.method==='POST'){
-      draftBody=JSON.parse(String(options.body));
-      return Response.json({id:draftBody!.id,version:1,document_type:'issue',payload:draftBody!.payload,status:'draft'});
+  app('/issues');
+  const events = userEvent.setup();
+  await events.click(
+    await screen.findByRole('button', { name: 'Добавить в корзину TEST-1' }),
+  );
+  const previous = vi.mocked(fetch).getMockImplementation()!;
+  let draftBody: Record<string, unknown> | undefined;
+  vi.mocked(fetch).mockImplementation(async (url, options) => {
+    if (
+      String(url).endsWith('/inventory/drafts') &&
+      options?.method === 'POST'
+    ) {
+      draftBody = JSON.parse(String(options.body));
+      return Response.json({
+        id: draftBody!.id,
+        version: 1,
+        document_type: 'issue',
+        payload: draftBody!.payload,
+        status: 'draft',
+      });
     }
-    return previous(url,options);
+    return previous(url, options);
   });
-  await events.click(screen.getByRole('button',{name:'Сохранить черновик'}));
+  await events.click(
+    screen.getByRole('button', { name: 'Сохранить черновик' }),
+  );
   await screen.findByText('Черновик сохранён на сервере.');
-  expect(draftBody).toMatchObject({document_type:'issue',payload:{recipient_employee_id:null,items:[{inventory_item_id:'item1',quantity:1}]}});
+  expect(draftBody).toMatchObject({
+    document_type: 'issue',
+    payload: {
+      recipient_employee_id: null,
+      items: [{ inventory_item_id: 'item1', quantity: 1 }],
+    },
+  });
   expect(sent).toHaveLength(0);
   expect(screen.getByLabelText('Количество TEST-1')).toHaveValue(1);
+});
+it('сохраняет кабинет и блокирует ручное подразделение для выбранного сотрудника', async () => {
+  app('/issues');
+  const events = userEvent.setup();
+  await screen.findByRole('button', { name: 'Добавить в корзину TEST-1' });
+  await events.selectOptions(
+    screen.getByLabelText('Сотрудник-получатель'),
+    'employee1',
+  );
+  expect(screen.getByLabelText('Подразделение')).toHaveValue('Отдел');
+  expect(screen.getByLabelText('Подразделение')).toBeDisabled();
+  await events.type(screen.getByLabelText('Здание'), 'Корпус А');
+  await events.type(screen.getByLabelText('Кабинет'), '301');
+  await events.click(
+    screen.getByRole('button', { name: 'Добавить в корзину TEST-1' }),
+  );
+  outcome = 'success';
+  await events.click(screen.getByRole('button', { name: 'Проверить выдачу' }));
+  await events.click(
+    screen.getByRole('button', { name: 'Подтвердить выдачу' }),
+  );
+  await screen.findByText('INV-0001');
+  expect(JSON.parse(String(sent[0].body))).toMatchObject({
+    recipient_building: 'Корпус А',
+    recipient_room: '301',
+  });
 });

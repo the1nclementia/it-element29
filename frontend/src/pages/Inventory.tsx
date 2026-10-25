@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader, Notice } from '../components/common';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../auth';
@@ -9,7 +9,8 @@ import { useDraft } from '../features/issues/state';
 export function Inventory() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [create, setCreate] = useState(false);
+  const [parameters, setParameters] = useSearchParams();
+  const [create, setCreate] = useState(parameters.get('create') === '1');
   const [added, setAdded] = useState('');
   const basket = useDraft('issue');
   const manage = user?.permissions.includes('inventory.manage');
@@ -20,7 +21,7 @@ export function Inventory() {
         title="Склад"
         description="Каталог расходных материалов, остатки и история операций"
       >
-        <div className="flex flex-wrap gap-2">
+        <div className="sticky top-3 z-20 flex flex-wrap justify-end gap-2">
           <Button variant="outline" asChild>
             <Link to="/inventory/documents">Документы</Link>
           </Button>
@@ -35,16 +36,19 @@ export function Inventory() {
               <Button onClick={() => setCreate(true)}>Создать позицию</Button>
             </>
           )}
-          {issue && (
-            <Button variant="outline" asChild>
-              <Link to="/issues">Корзина ({basket.draft.lines.length})</Link>
-            </Button>
-          )}
         </div>
       </PageHeader>
       {added && (
         <div className="mb-4">
-          <Notice success>{added} добавлен в корзину.</Notice>
+          <Notice success>
+            <span>
+              Позиция добавлена в корзину{' '}
+              <span className="text-emerald-700">({added})</span>.{' '}
+            </span>
+            <Link className="font-semibold underline" to="/issues">
+              Перейти в корзину
+            </Link>
+          </Notice>
         </div>
       )}
       {basket.locked && (
@@ -54,6 +58,7 @@ export function Inventory() {
       )}
       <Catalog
         disabled={basket.locked}
+        basketCount={issue ? basket.draft.lines.length : undefined}
         onAdd={
           issue
             ? (item) => {
@@ -63,9 +68,13 @@ export function Inventory() {
             : undefined
         }
       />
-      {create && (
+      {create && manage && (
         <ItemForm
-          onClose={() => setCreate(false)}
+          onClose={() => {
+            setCreate(false);
+            parameters.delete('create');
+            setParameters(parameters, { replace: true });
+          }}
           onSaved={(item) => navigate(`/inventory/items/${item.id}`)}
         />
       )}

@@ -1,16 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  Activity,
-  Archive,
   ArrowDownToLine,
-  ArrowLeftRight,
+  ArrowRight,
   ArrowUpRight,
   Boxes,
-  CircleHelp,
-  Clock3,
+  ClipboardList,
   Monitor,
   Package,
-  ShieldCheck,
+  PackagePlus,
+  Plus,
   TriangleAlert,
   Wrench,
   type LucideIcon,
@@ -19,156 +17,305 @@ import { Link } from 'react-router-dom';
 import { request } from '../lib/api';
 import { formatDate } from '../lib/utils';
 import type { Dashboard as DashboardData, Metric } from '../types';
+import type {
+  InventoryDocument,
+  InventoryItem,
+  Page,
+} from '../features/inventory/types';
+import { documentNames } from '../features/inventory/types';
 import {
   EmptyState,
   ErrorState,
   LoadingState,
-  PageHeader,
   StatusBadge,
 } from '../components/common';
-import { modules } from '../components/layout';
 import { useAuth } from '../auth';
+
 const icons: Record<string, LucideIcon> = {
-  equipment_total: Monitor,
-  equipment_active: Activity,
-  equipment_stock: Archive,
-  equipment_maintenance: Wrench,
   cartridge_balance: Package,
   issues_today: ArrowDownToLine,
-  movements_month: ArrowLeftRight,
   low_stock: TriangleAlert,
+  equipment_total: Monitor,
+  equipment_active: Monitor,
+  equipment_stock: Boxes,
+  equipment_maintenance: Wrench,
 };
+const actions = [
+  {
+    label: 'Добавить номенклатуру',
+    description: 'Новая позиция каталога',
+    path: '/inventory?create=1',
+    permission: 'inventory.manage',
+    icon: Plus,
+  },
+  {
+    label: 'Новое поступление',
+    description: 'Пополнить склад',
+    path: '/inventory/receipt',
+    permission: 'inventory.manage',
+    icon: PackagePlus,
+  },
+  {
+    label: 'Новая выдача',
+    description: 'Передать сотруднику',
+    path: '/issues',
+    permission: 'inventory.issue',
+    icon: ArrowUpRight,
+  },
+  {
+    label: 'Открыть склад',
+    description: 'Каталог и остатки',
+    path: '/inventory',
+    permission: 'inventory.read',
+    icon: Boxes,
+  },
+];
+
 export function StatCard({ metric }: { metric: Metric }) {
   const Icon = icons[metric.key] ?? Boxes;
   return (
-    <article className="rounded-xl border border-border bg-white p-5 shadow-[0_2px_4px_0_#172b4d03]">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[13px] font-medium text-muted">{metric.label}</p>
-        <span className="rounded-lg bg-blue-50 p-2 text-primary">
-          <Icon className="size-[18px]" strokeWidth={1.7} />
-        </span>
+    <article className="surface-card flex items-start justify-between gap-4 p-6">
+      <div>
+        <p className="text-sm text-muted">{metric.label}</p>
+        <p
+          className="mt-3 text-[34px] font-semibold leading-none tracking-tight"
+          aria-label={metric.value === null ? 'Значение недоступно' : undefined}
+        >
+          {metric.value === null ? '—' : metric.value.toLocaleString('ru-RU')}
+        </p>
+        <p className="mt-3 text-xs text-muted">
+          {metric.value === null
+            ? 'Значение временно недоступно'
+            : 'По данным системы'}
+        </p>
       </div>
-      <p
-        className="mt-4 text-3xl font-semibold tracking-tight"
-        aria-label={metric.value === null ? 'Значение недоступно' : undefined}
-      >
-        {metric.value === null ? '—' : metric.value.toLocaleString('ru-RU')}
-      </p>
-      <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400">
-        <CircleHelp className="size-3" />
-        {metric.available
-          ? 'По данным системы'
-          : 'Данные появятся после запуска модуля'}
-      </p>
+      <span className="rounded-2xl bg-primary-light p-3 text-primary">
+        <Icon className="size-5" strokeWidth={1.7} />
+      </span>
     </article>
   );
 }
+
 export function Dashboard() {
   const { user } = useAuth();
+  const canRead = !!user?.permissions.includes('inventory.read');
   const query = useQuery({
     queryKey: ['dashboard'],
     queryFn: ({ signal }) => request<DashboardData>('/dashboard', { signal }),
   });
-  if (query.isPending) return <LoadingState />;
-  if (query.error)
-    return (
-      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
-    );
+  const documents = useQuery({
+    queryKey: ['warehouse', 'dashboard-documents'],
+    queryFn: ({ signal }) =>
+      request<Page<InventoryDocument>>(
+        '/inventory/documents?limit=5&offset=0',
+        { signal },
+      ),
+    enabled: canRead,
+  });
+  const lowStock = useQuery({
+    queryKey: ['warehouse', 'dashboard-low-stock'],
+    queryFn: ({ signal }) =>
+      request<Page<InventoryItem>>(
+        '/inventory/items?low_stock=true&limit=5&offset=0',
+        { signal },
+      ),
+    enabled: canRead,
+  });
+  const visibleActions = actions.filter((action) =>
+    user?.permissions.includes(action.permission),
+  );
   return (
-    <>
-      <PageHeader
-        title="Обзор системы"
-        description="Ресурсы организации и последние события в одном месте"
-      >
-        <span className="rounded-lg border border-border bg-white px-3 py-2 text-xs text-muted">
-          {formatDate(new Date().toISOString())}
-        </span>
-      </PageHeader>
-      <div className="mb-7 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white px-5 py-4">
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-white text-primary">
-            <ShieldCheck className="size-5" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Рабочее пространство готово</p>
-            <p className="mt-1 text-xs leading-5 text-muted">
-              Учитывайте поступления и выдачи, проверяйте складские остатки и
-              историю документов.
-            </p>
-          </div>
+    <div className="space-y-7 sm:space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-3 text-[11px] font-semibold tracking-[.18em] text-muted">
+            РАБОЧЕЕ ПРОСТРАНСТВО
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-[36px] sm:leading-tight">
+            Добро пожаловать!
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-muted sm:text-base">
+            Управление складом картриджей и техникой
+          </p>
         </div>
-        <StatusBadge>Этап 3 · Склад и выдача</StatusBadge>
+        <p className="text-xs text-muted">
+          {formatDate(new Date().toISOString())}
+        </p>
       </div>
-      <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-4">
-        {query.data.metrics.map((metric) => (
-          <StatCard key={metric.key} metric={metric} />
-        ))}
-      </div>
-      <div className="mt-7 grid gap-5 xl:grid-cols-[1.5fr_1fr]">
-        <section className="rounded-xl border border-border bg-white">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="text-sm font-semibold">Последние события</h2>
-            <Clock3 className="size-4 text-slate-400" />
-          </div>
-          {query.data.recent_events.length === 0 ? (
-            <EmptyState
-              title="Пока нет событий"
-              description="Здесь появятся ваши действия в системе."
-              icon={Clock3}
-            />
-          ) : (
-            <ul className="divide-y divide-border px-5">
-              {query.data.recent_events.map((event) => (
-                <li key={event.id} className="flex gap-3 py-4">
-                  <span className="mt-1.5 size-2 shrink-0 rounded-full bg-blue-400" />
-                  <div>
-                    <p className="text-sm">{event.title}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {formatDate(event.occurred_at)} ·{' '}
-                      {new Date(event.occurred_at).toLocaleTimeString('ru-RU', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        <section className="rounded-xl border border-border bg-white">
-          <div className="border-b border-border px-5 py-4">
-            <h2 className="text-sm font-semibold">Разделы системы</h2>
-          </div>
-          <div className="space-y-1 p-3">
-            {modules
-              .filter(
-                (module) =>
-                  ['/inventory', '/equipment', '/users', '/settings'].includes(
-                    module.path,
-                  ) && user?.permissions.includes(module.permission),
-              )
-              .map(({ path, label, description, icon: Icon }) => (
-                <Link
-                  key={path}
-                  to={path}
-                  className="group flex items-center gap-3 rounded-lg p-3 transition hover:bg-slate-50"
-                >
-                  <span className="rounded-lg bg-slate-50 p-2.5 text-muted group-hover:bg-blue-50 group-hover:text-primary">
-                    <Icon className="size-5" strokeWidth={1.7} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{label}</p>
-                    <p className="mt-0.5 text-xs leading-5 text-muted">
-                      {description}
-                    </p>
-                  </div>
-                  <ArrowUpRight className="size-4 shrink-0 text-slate-400" />
-                </Link>
-              ))}
+      {visibleActions.length > 0 && (
+        <section aria-labelledby="quick-actions-title">
+          <h2 id="quick-actions-title" className="mb-4 text-base font-semibold">
+            Быстрые действия
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {visibleActions.map(({ label, description, path, icon: Icon }) => (
+              <Link
+                key={path}
+                to={path}
+                className="surface-card group flex min-h-28 items-center gap-3 p-5 transition-colors hover:border-primary/40 hover:bg-primary-light/40"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-light text-primary">
+                  <Icon className="size-5" strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold leading-5">{label}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    {description}
+                  </p>
+                </div>
+                <ArrowRight className="size-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            ))}
           </div>
         </section>
-      </div>
-    </>
+      )}
+      {query.isPending ? (
+        <LoadingState />
+      ) : query.error ? (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-3">
+          {query.data.metrics
+            .filter((metric) => metric.key in icons && metric.available)
+            .map((metric) => (
+              <StatCard key={metric.key} metric={metric} />
+            ))}
+        </div>
+      )}
+      {canRead && (
+        <div className="grid items-start gap-5 xl:grid-cols-[1.45fr_1fr]">
+          <section
+            className="surface-card overflow-hidden"
+            aria-labelledby="recent-documents-title"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-5 sm:px-6">
+              <h2
+                id="recent-documents-title"
+                className="text-base font-semibold"
+              >
+                Последние документы
+              </h2>
+              <Link
+                to="/inventory/documents"
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover"
+              >
+                Все документы <ArrowRight className="size-3.5" />
+              </Link>
+            </div>
+            {documents.isPending ? (
+              <LoadingState />
+            ) : documents.error ? (
+              <ErrorState
+                error={documents.error}
+                onRetry={() => void documents.refetch()}
+              />
+            ) : documents.data.items.length === 0 ? (
+              <EmptyState
+                title="Документов пока нет"
+                description="Оформите поступление или выдачу — документ появится здесь."
+                icon={ClipboardList}
+              />
+            ) : (
+              <ul className="divide-y divide-border">
+                {documents.data.items.map((document) => (
+                  <li key={document.id}>
+                    <Link
+                      to={`/inventory/documents/${document.id}`}
+                      className="flex flex-wrap items-center gap-3 p-5 transition-colors hover:bg-background sm:px-6"
+                    >
+                      <span className="rounded-xl bg-background p-2.5 text-muted">
+                        <ClipboardList className="size-4" />
+                      </span>
+                      <div className="min-w-0 flex-1 basis-32">
+                        <p className="break-words text-sm font-medium">
+                          {document.number}
+                        </p>
+                        <p className="mt-1 text-xs text-muted">
+                          {documentNames[document.document_type]} ·{' '}
+                          {formatDate(document.document_date)}
+                        </p>
+                      </div>
+                      <StatusBadge
+                        active={document.is_cancelled ? false : undefined}
+                      >
+                        {document.is_cancelled
+                          ? 'Отменён'
+                          : document.document_type === 'reversal'
+                            ? 'Отмена'
+                            : 'Проведён'}
+                      </StatusBadge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section
+            className="surface-card overflow-hidden"
+            aria-labelledby="low-stock-title"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-border p-5 sm:px-6">
+              <h2 id="low-stock-title" className="text-base font-semibold">
+                Требуют пополнения
+              </h2>
+              <TriangleAlert className="size-4 text-primary" />
+            </div>
+            {lowStock.isPending ? (
+              <LoadingState />
+            ) : lowStock.error ? (
+              <ErrorState
+                error={lowStock.error}
+                onRetry={() => void lowStock.refetch()}
+              />
+            ) : lowStock.data.items.length === 0 ? (
+              <EmptyState
+                title="Все остатки в норме"
+                description="Все активные позиции есть в наличии, их остатки выше установленного минимума."
+                icon={Package}
+              />
+            ) : (
+              <>
+                <ul className="divide-y divide-border">
+                  {lowStock.data.items.map((item) => (
+                    <li key={item.id}>
+                      <Link
+                        to={`/inventory/items/${item.id}`}
+                        className="flex items-center gap-4 p-5 transition-colors hover:bg-background sm:px-6"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-sm font-medium">
+                            {item.manufacturer_name} {item.model}
+                          </p>
+                          <p className="mt-1 text-xs text-muted">
+                            {item.internal_code} · Минимум {item.min_stock} шт.
+                          </p>
+                          <p className="mt-1 text-xs text-orange-700">
+                            {item.balance === 0
+                              ? 'Нет в наличии'
+                              : 'Достигнут минимальный остаток'}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-lg bg-primary-light px-2.5 py-1.5 text-sm font-semibold text-primary">
+                          {item.balance} шт.
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <div className="border-t border-border p-5 sm:px-6">
+                  <Link
+                    to="/inventory?low_stock=true"
+                    className="text-xs font-medium text-primary hover:text-primary-hover"
+                  >
+                    Показать все ({lowStock.data.total}){' '}
+                    <ArrowRight className="ml-1 inline size-3.5" />
+                  </Link>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
   );
 }

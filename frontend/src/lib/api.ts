@@ -38,10 +38,11 @@ export async function refreshCsrf() {
 type Options = Omit<RequestInit, 'body'> & {
   body?: unknown;
   anonymous?: boolean;
+  responseType?: 'json' | 'blob';
 };
 export async function request<T>(
   path: string,
-  { body, anonymous = false, ...options }: Options = {},
+  { body, anonymous = false, responseType = 'json', ...options }: Options = {},
 ): Promise<T> {
   const headers = new Headers(options.headers);
   const multipart = body instanceof FormData;
@@ -101,6 +102,7 @@ export async function request<T>(
     );
   }
   if (response.status === 204) return undefined as T;
+  if (responseType === 'blob') return (await response.blob()) as T;
   try {
     return (await response.json()) as T;
   } catch {

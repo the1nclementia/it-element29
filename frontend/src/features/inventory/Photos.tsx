@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { PhotoPicker, usePhotoQueue } from './PhotoPicker';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import {
@@ -25,7 +26,7 @@ export function Photos({
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
   const [archive, setArchive] = useState<Photo>();
-  const input = useRef<HTMLInputElement>(null);
+  const queue = usePhotoQueue();
   async function mutate(path: string, method: string, body?: unknown) {
     setPending(true);
     setError('');
@@ -36,7 +37,6 @@ export function Photos({
       });
       await client.invalidateQueries({ queryKey: ['warehouse'] });
       setArchive(undefined);
-      if (input.current) input.current.value = '';
     } catch (error) {
       setError((error as Error).message);
     } finally {
@@ -48,31 +48,32 @@ export function Photos({
       <h2 className="text-lg font-semibold">Фотографии</h2>
       {error && <Notice>{error}</Notice>}
       {manage && (
-        <Field
-          label="Загрузить фото"
-          hint="JPEG, PNG или WebP; до 5 МБ и 20 Мп, не более 5 фото."
-        >
-          {(id) => (
-            <Input
-              id={id}
-              ref={input}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={pending || (query.data?.total ?? 0) >= 5}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                if (file.size > 5 * 1024 * 1024) {
-                  setError('Размер фотографии превышает 5 МБ.');
-                  return;
+        <>
+          <PhotoPicker
+            queue={queue}
+            existing={query.data?.total ?? 0}
+            disabled={pending || query.isPending}
+          />
+          {queue.photos.length > 0 && (
+            <Button
+              disabled={pending}
+              onClick={async () => {
+                setPending(true);
+                setError('');
+                try {
+                  await queue.upload(itemId);
+                } catch (error) {
+                  setError((error as Error).message);
+                } finally {
+                  await client.invalidateQueries({ queryKey: ['warehouse'] });
+                  setPending(false);
                 }
-                const body = new FormData();
-                body.append('file', file);
-                void mutate('', 'POST', body);
               }}
-            />
+            >
+              Сохранить фотографии
+            </Button>
           )}
-        </Field>
+        </>
       )}
       {query.isPending ? (
         <LoadingState />

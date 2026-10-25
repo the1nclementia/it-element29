@@ -204,7 +204,15 @@ def test_each_role_and_direct_admin_api(client, identity_db, role, allowed, deni
             )
         metrics = member.get("/api/v1/dashboard").json()["metrics"]
         assert len(metrics) == 8
-        available = {"cartridge_balance", "issues_today", "low_stock"}
+        available = {
+            "cartridge_balance",
+            "issues_today",
+            "low_stock",
+            "equipment_total",
+            "equipment_active",
+            "equipment_stock",
+            "equipment_maintenance",
+        }
         for metric in metrics:
             if metric["key"] in available:
                 assert metric["value"] == 0 and metric["available"]

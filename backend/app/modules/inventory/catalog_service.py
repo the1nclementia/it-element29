@@ -17,12 +17,16 @@ from app.modules.inventory.models import (
     InventoryItem,
     Manufacturer,
     PrinterModel,
+    inventory_category_code_seq,
+    inventory_item_code_seq,
 )
 from app.modules.inventory.repository import (
     archived_filter,
     balance_query,
     escaped_like,
     get_balance,
+    is_low_stock,
+    low_stock_expression,
 )
 
 
@@ -55,6 +59,16 @@ def commit(session: Session):
     except IntegrityError:
         session.rollback()
         fail(409, "duplicate_record", "Запись с такими уникальными полями уже существует.")
+
+
+def next_generated_code(session: Session, model, sequence, prefix: str) -> str:
+    """Allocate a stable code while avoiding explicit legacy codes."""
+    while True:
+        number = session.scalar(select(sequence.next_value()))
+        candidate = f"{prefix}-{number:06d}"
+        code_column = model.code if model is InventoryCategory else model.internal_code
+        if session.scalar(select(model.id).where(code_column == candidate)) is None:
+            return candidate
 
 
 def base_response(record):
@@ -101,13 +115,16 @@ def item_response(session: Session, item: InventoryItem, balance: int | None = N
                 "article",
                 "description",
                 "min_stock",
+                "accounting_mode",
+                "item_type",
             )
         },
         "category_name": session.get(InventoryCategory, item.category_id).name,
         "manufacturer_name": session.get(Manufacturer, item.manufacturer_id).name,
         "balance": balance,
         "unit": "pcs",
-        "is_low_stock": item.min_stock > 0 and balance < item.min_stock,
+        "is_low_stock": item.accounting_mode == "quantity"
+        and is_low_stock(balance, item.min_stock),
         "primary_photo_url": f"/api/v1/inventory/items/{item.id}/photos/{photo_id}/content"
         if photo_id
         else None,
@@ -139,8 +156,10 @@ def save_reference(session: Session, actor, session_hash, model, payload, record
     if model is InventoryCategory and "name" in values:
         # Existing category schema has no normalized name column. Serialize API
         # creates/renames before row/auth locks; preserve already stored categories.
-        session.execute(text("SELECT pg_advisory_xact_lock(:namespace, :resource)"),
-                        {"namespace": 29, "resource": 3})
+        session.execute(
+            text("SELECT pg_advisory_xact_lock(:namespace, :resource)"),
+            {"namespace": 29, "resource": 3},
+        )
     if model is PrinterModel:
         previous = session.get(model, record_id) if record_id else None
         if record_id and previous is None:
@@ -168,14 +187,23 @@ def save_reference(session: Session, actor, session_hash, model, payload, record
     if model is InventoryCategory and "name" in values:
         name_key = normalize_key(values["name"])
         names = session.execute(select(InventoryCategory.id, InventoryCategory.name))
-        if any(existing_id != record_id and normalize_key(name) == name_key
-               for existing_id, name in names):
-            fail(409, "duplicate_record",
-                 "Категория с таким названием уже существует, в том числе в архиве.")
+        if any(
+            existing_id != record_id and normalize_key(name) == name_key
+            for existing_id, name in names
+        ):
+            fail(
+                409,
+                "duplicate_record",
+                "Категория с таким названием уже существует, в том числе в архиве.",
+            )
     if model is Manufacturer and "name" in values:
         values["name_key"] = normalize_key(values["name"])
     if model is PrinterModel and "model" in values:
         values["model_key"] = normalize_key(values["model"])
+    if record is None and model is InventoryCategory and values.get("code") is None:
+        values["code"] = next_generated_code(
+            session, InventoryCategory, inventory_category_code_seq, "CAT"
+        )
     if record is None:
         record = model(**values)
         session.add(record)
@@ -265,20 +293,22 @@ def item_query(
     if in_stock is not None:
         statement = statement.where((amount > 0) if in_stock else (amount == 0))
     if low_stock is not None:
-        low = (InventoryItem.min_stock > 0) & (amount < InventoryItem.min_stock)
+        low = low_stock_expression(amount, InventoryItem.min_stock) & (
+            InventoryItem.accounting_mode == "quantity"
+        )
         statement = statement.where(low if low_stock else ~low)
     order = {"code": InventoryItem.internal_code, "model": InventoryItem.model, "balance": amount}[
         sort
     ]
-    return statement.order_by(order.desc() if direction == "desc" else order.asc(), InventoryItem.id)
+    return statement.order_by(
+        order.desc() if direction == "desc" else order.asc(), InventoryItem.id
+    )
 
 
 def list_items(session: Session, *, offset=0, limit=20, **filters):
     statement = item_query(session, **filters)
     total = session.scalar(select(func.count()).select_from(statement.order_by(None).subquery()))
-    rows = session.execute(
-        statement.offset(offset).limit(limit)
-    )
+    rows = session.execute(statement.offset(offset).limit(limit))
     return {
         "items": [item_response(session, item, int(amount)) for item, amount in rows],
         "total": total,
@@ -317,11 +347,44 @@ def save_item(session: Session, actor, session_hash, payload, item_id=None):
         check_version(item, version)
         if item.archived_at is not None:
             fail(409, "record_archived", "Сначала восстановите позицию из архива.")
+        if (
+            item.accounting_mode == "serialized"
+            and "manufacturer_id" in values
+            and values["manufacturer_id"] != item.manufacturer_id
+        ):
+            from app.modules.equipment.models import EquipmentInstance
+
+            if session.scalar(
+                select(EquipmentInstance.id).where(EquipmentInstance.inventory_item_id == item.id)
+            ):
+                fail(
+                    409,
+                    "manufacturer_locked",
+                    "Производителя нельзя менять после регистрации экземпляров.",
+                )
     revalidate_mutation(session, actor, session_hash, "inventory.manage")
     if item is None:
+        if values.get("internal_code") is None:
+            session.execute(
+                text("SELECT pg_advisory_xact_lock(:namespace, :resource)"),
+                {"namespace": 29, "resource": 4},
+            )
+            values["internal_code"] = next_generated_code(
+                session, InventoryItem, inventory_item_code_seq, "ITEM"
+            )
         item = InventoryItem(**values)
         session.add(item)
     else:
+        if "accounting_mode" in values and values["accounting_mode"] != item.accounting_mode:
+            fail(409, "accounting_mode_locked", "Режим учёта нельзя менять после создания позиции.")
+        if "item_type" in values and values["item_type"] != item.item_type:
+            fail(409, "item_type_locked", "Вид номенклатуры нельзя менять после создания позиции.")
+        target_mode = values.get("accounting_mode", item.accounting_mode)
+        target_type = values.get("item_type", item.item_type)
+        if target_mode == "serialized" and target_type in {"cartridge", "consumable"}:
+            fail(
+                422, "invalid_accounting_type", "Для поэкземплярного учёта нужен тип оборудования."
+            )
         for name, value in values.items():
             setattr(item, name, value)
         item.version += 1

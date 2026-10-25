@@ -1,9 +1,19 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.modules.inventory.models import InventoryMovement
+
+
+def is_low_stock(balance: int, minimum: int) -> bool:
+    """Return the shared attention rule for a current stock balance."""
+    return (minimum > 0 and balance <= minimum) or (minimum == 0 and balance == 0)
+
+
+def low_stock_expression(balance, minimum):
+    """Build the SQL expression matching :func:`is_low_stock`."""
+    return or_(and_(minimum > 0, balance <= minimum), and_(minimum == 0, balance == 0))
 
 
 def balances(session: Session, item_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:

@@ -123,7 +123,9 @@ export function ItemDetails() {
             </StatusBadge>
             {item.is_low_stock && (
               <span className="text-sm text-orange-700">
-                Ниже минимального остатка
+                {item.balance === 0
+                  ? 'Нет в наличии'
+                  : 'Достигнут минимальный остаток — требуется пополнение'}
               </span>
             )}
           </div>
@@ -273,11 +275,21 @@ export function ItemDetails() {
             <LoadingState />
           ) : (
             <div className="max-h-80 space-y-3 overflow-y-auto">
-              {[...printers.data,...(compatibility.data?.items.filter(printer=>printer.archived_at&&!printers.data.some(active=>active.id===printer.id))??[])].map((printer) => (
+              {[
+                ...printers.data,
+                ...(compatibility.data?.items.filter(
+                  (printer) =>
+                    printer.archived_at &&
+                    !printers.data.some((active) => active.id === printer.id),
+                ) ?? []),
+              ].map((printer) => (
                 <label key={printer.id} className="flex gap-3 text-sm">
                   <input
                     type="checkbox"
-                    disabled={pending || !!printer.archived_at && !selected?.includes(printer.id)}
+                    disabled={
+                      pending ||
+                      (!!printer.archived_at && !selected?.includes(printer.id))
+                    }
                     checked={selected?.includes(printer.id) ?? false}
                     onChange={(event) =>
                       setSelected((previous) =>
@@ -290,7 +302,10 @@ export function ItemDetails() {
                     }
                   />
                   <span className="break-words">
-                    {printer.manufacturer_name} {printer.model}{printer.archived_at?' (архив — снимите выбор для сохранения)':''}
+                    {printer.manufacturer_name} {printer.model}
+                    {printer.archived_at
+                      ? ' (архив — снимите выбор для сохранения)'
+                      : ''}
                   </span>
                 </label>
               ))}

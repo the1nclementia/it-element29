@@ -1,21 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Archive,
+  ArrowDownToLine,
   ArrowLeftRight,
   BarChart3,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   FileChartColumn,
+  FilePenLine,
   History,
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   Monitor,
   PackageOpen,
   Settings,
   ShieldCheck,
+  Sun,
   Users,
   Wrench,
   X,
@@ -30,6 +34,7 @@ export const modules: {
   path: string;
   label: string;
   permission: string;
+  alternativePermission?: string;
   icon: LucideIcon;
   group: string;
   description: string;
@@ -49,6 +54,23 @@ export const modules: {
     icon: Archive,
     group: 'Рабочее пространство',
     description: 'Расходные материалы, остатки и поступления',
+  },
+  {
+    path: '/inventory/receipt',
+    label: 'Поступления',
+    permission: 'inventory.manage',
+    icon: ArrowDownToLine,
+    group: 'Рабочее пространство',
+    description: 'Поступление расходных материалов на склад',
+  },
+  {
+    path: '/inventory/drafts',
+    label: 'Мои черновики',
+    permission: 'inventory.issue',
+    alternativePermission: 'inventory.manage',
+    icon: FilePenLine,
+    group: 'Рабочее пространство',
+    description: 'Незавершённые поступления и выдачи',
   },
   {
     path: '/issues',
@@ -85,7 +107,7 @@ export const modules: {
   {
     path: '/history',
     label: 'История',
-    permission: 'history.read',
+    permission: 'inventory.read',
     icon: History,
     group: 'Аналитика',
     description: 'История операций с ИТ-ресурсами',
@@ -101,7 +123,7 @@ export const modules: {
   {
     path: '/reports',
     label: 'Отчёты',
-    permission: 'reports.read',
+    permission: 'inventory.read',
     icon: FileChartColumn,
     group: 'Аналитика',
     description: 'Отчётность по ресурсам организации',
@@ -138,7 +160,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
     </span>
   ) : (
     <span className="brand-window">
-      <img src="/brand/wordmark-transparent.png" alt="ИТ-элемент [29]" />
+      <img src="/brand/wordmark-login.svg" alt="ИТ-элемент [29]" />
     </span>
   );
 }
@@ -154,8 +176,10 @@ export function Sidebar({
 
   const visible = modules.filter(
     (module) =>
-      user?.permissions.includes(module.permission) &&
-      (!user.must_change_password || module.path === '/settings'),
+      (user?.permissions.includes(module.permission) ||
+        (!!module.alternativePermission &&
+          user?.permissions.includes(module.alternativePermission))) &&
+      (!user?.must_change_password || module.path === '/settings'),
   );
 
   const groups = ['Рабочее пространство', 'Аналитика', 'Управление'];
@@ -199,7 +223,7 @@ export function Sidebar({
                   <NavLink
                     key={path}
                     to={path}
-                    end={path === '/'}
+                    end={path === '/' || path === '/inventory'}
                     title={collapsed ? label : undefined}
                     onClick={onNavigate}
                     className={({ isActive }) =>
@@ -207,7 +231,7 @@ export function Sidebar({
                         'flex min-h-11 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors',
                         collapsed && 'justify-center',
                         isActive
-                          ? 'bg-blue-50 text-primary'
+                          ? 'bg-primary-light text-primary-hover'
                           : 'text-muted hover:bg-slate-50 hover:text-foreground',
                       )
                     }
@@ -250,10 +274,23 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const location = useLocation();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const [dark, setDark] = useState(
+    () => window.localStorage.getItem('e29-theme') === 'dark',
+  );
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    window.localStorage.setItem('e29-theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
   const name =
     modules.find((module) => module.path === location.pathname)?.label ??
-    'Страница';
+    (location.pathname.startsWith('/inventory/documents')
+      ? 'Документы склада'
+      : location.pathname.startsWith('/inventory/items')
+        ? 'Номенклатура'
+        : location.pathname === '/inventory/catalogs'
+          ? 'Справочники склада'
+          : 'Страница');
 
   const initials = (user?.display_name ?? '')
     .split(' ')
@@ -278,7 +315,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   return (
     <>
       <header className="flex h-20 shrink-0 items-center justify-between gap-3 border-b border-border bg-white px-5 sm:px-8">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -289,16 +326,67 @@ export function Header({ onMenu }: { onMenu: () => void }) {
             <Menu />
           </Button>
 
-          <div className="text-sm">
-            <span className="hidden text-slate-400 sm:inline">
-              Рабочее пространство
-              <span className="mx-3 text-slate-300">/</span>
-            </span>
-            <span className="font-medium">{name}</span>
-          </div>
+          <nav
+            aria-label="Хлебные крошки"
+            className="min-w-0 text-xs sm:text-sm"
+          >
+            <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {location.pathname !== '/' && (
+                <li className="flex items-center gap-2">
+                  <Link
+                    to="/"
+                    className="text-muted hover:text-foreground hover:underline"
+                  >
+                    Обзор
+                  </Link>
+                  <span aria-hidden="true" className="text-slate-300">
+                    /
+                  </span>
+                </li>
+              )}
+              {location.pathname.startsWith('/inventory/') && (
+                <li className="flex items-center gap-2">
+                  <Link
+                    to="/inventory"
+                    className="text-muted hover:text-foreground hover:underline"
+                  >
+                    Склад
+                  </Link>
+                  <span aria-hidden="true" className="text-slate-300">
+                    /
+                  </span>
+                </li>
+              )}
+              {location.pathname.startsWith('/inventory/documents/') && (
+                <li className="flex items-center gap-2">
+                  <Link
+                    to="/history"
+                    className="text-muted hover:text-foreground hover:underline"
+                  >
+                    История
+                  </Link>
+                  <span aria-hidden="true" className="text-slate-300">
+                    /
+                  </span>
+                </li>
+              )}
+              <li aria-current="page" className="font-medium">
+                {name}
+              </li>
+            </ol>
+          </nav>
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'}
+            aria-pressed={dark}
+            onClick={() => setDark((value) => !value)}
+          >
+            {dark ? <Sun /> : <Moon />}
+          </Button>
           <div className="hidden text-right sm:block">
             <p className="max-w-52 truncate text-sm font-medium">
               {user?.display_name}
@@ -309,7 +397,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           <Link
             to="/settings"
             aria-label="Мой профиль"
-            className="flex size-10 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-primary"
+            className="flex size-10 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary-hover"
           >
             {initials}
           </Link>
@@ -341,7 +429,10 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
   return (
-    <div className="min-h-dvh">
+    <div className="relative isolate min-h-dvh">
+      <span className="brand-watermark" aria-hidden="true">
+        [29]
+      </span>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-white focus:p-3"

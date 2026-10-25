@@ -24,7 +24,7 @@ import {
   type Employee,
 } from '../features/inventory/types';
 export function Documents() {
-  const {user} = useAuth();
+  const { user } = useAuth();
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
   const documents = useList<InventoryDocument>('/inventory/documents', {
@@ -116,7 +116,16 @@ export function Documents() {
               </Select>
             )}
           </Field>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={filters.created_by_id===user?.id} onChange={event=>filter('created_by_id',event.target.checked?user!.id:'')}/>Только мои операции</label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={filters.created_by_id === user?.id}
+              onChange={(event) =>
+                filter('created_by_id', event.target.checked ? user!.id : '')
+              }
+            />
+            Только мои операции
+          </label>
         </div>
         {documents.isPending ? (
           <LoadingState />
@@ -135,9 +144,9 @@ export function Documents() {
             {documents.data.items.map((document) => (
               <li
                 key={document.id}
-                className="flex flex-wrap justify-between gap-3 p-5 text-sm"
+                className="flex flex-wrap items-start justify-between gap-3 p-5 text-sm"
               >
-                <div className="min-w-0 break-words">
+                <div className="min-w-0 flex-1 basis-64 break-words">
                   <Link
                     className="font-semibold text-primary hover:underline"
                     to={`/inventory/documents/${document.id}`}
@@ -146,11 +155,73 @@ export function Documents() {
                   </Link>
                   <p className="mt-1 text-muted">
                     {documentNames[document.document_type]} ·{' '}
-                    {document.document_date} ·{' '}
-                    {document.recipient_name ?? document.created_by_name}
+                    {document.document_date}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    Автор: {document.created_by_name} · Оформлен{' '}
+                    <time dateTime={document.created_at}>
+                      {new Date(document.created_at).toLocaleString('ru-RU', {
+                        timeZone: 'Asia/Yekaterinburg',
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      })}{' '}
+                      (Екатеринбург)
+                    </time>
+                  </p>
+                  {document.recipient_name && (
+                    <p className="mt-1 text-xs text-muted">
+                      Получатель: {document.recipient_name}
+                      {document.recipient_department &&
+                        ` · ${document.recipient_department}`}
+                      {document.recipient_room &&
+                        ` · каб. ${document.recipient_room}`}
+                    </p>
+                  )}
+                  {document.supplier_name && (
+                    <p className="mt-1 text-xs text-muted">
+                      Поставщик: {document.supplier_name}
+                    </p>
+                  )}
+                  <ul
+                    className="mt-3 space-y-1"
+                    aria-label="Краткий состав документа"
+                  >
+                    {document.items.slice(0, 2).map((item) => (
+                      <li key={item.id}>
+                        {item.manufacturer} {item.model}{' '}
+                        <span className="text-muted">
+                          ({item.internal_code})
+                        </span>{' '}
+                        — {item.quantity} шт.
+                      </li>
+                    ))}
+                  </ul>
+                  {document.items.length > 2 && (
+                    <p className="mt-1 text-xs text-muted">
+                      Ещё позиций: {document.items.length - 2}
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs font-medium">
+                    Позиций: {document.items.length} · Всего:{' '}
+                    {document.items.reduce(
+                      (sum, item) => sum + item.quantity,
+                      0,
+                    )}{' '}
+                    шт.
                   </p>
                 </div>
-                {document.is_cancelled && <span>Отменён</span>}
+                <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end">
+                  <span className="rounded-md bg-background px-2 py-1 text-xs text-muted">
+                    {document.is_cancelled ? 'Отменён' : 'Проведён'}
+                  </span>
+                  <Link
+                    className="text-xs font-medium text-primary hover:underline"
+                    to={`/inventory/documents/${document.id}`}
+                    aria-label={`Подробнее о документе ${document.number}`}
+                  >
+                    Подробнее
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>

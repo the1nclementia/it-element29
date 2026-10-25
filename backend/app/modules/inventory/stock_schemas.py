@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 
 
 class StockInput(BaseModel):
@@ -30,11 +30,109 @@ class DocumentInput(StockInput):
 class ReceiptInput(DocumentInput):
     receipt_purpose: Literal["delivery", "opening_balance"] = "delivery"
     external_number: str | None = Field(default=None, max_length=100)
+    supplier_name: str | None = Field(default=None, max_length=200)
 
 
 class IssueInput(DocumentInput):
-    recipient_employee_id: uuid.UUID
+    recipient_employee_id: uuid.UUID | None = None
+    recipient_name: str | None = Field(default=None, max_length=300)
+    recipient_building: str | None = Field(default=None, max_length=200)
+    recipient_department: str | None = Field(default=None, max_length=200)
+    recipient_room: str | None = Field(default=None, max_length=100)
+
+    @field_validator(
+        "recipient_name", "recipient_building", "recipient_department", "recipient_room"
+    )
+    @classmethod
+    def trim_recipient_fields(cls, value):
+        return value.strip() if value is not None else value
+
+    @model_validator(mode="after")
+    def recipient_required(self):
+        if self.recipient_employee_id is None and not self.recipient_name:
+            raise ValueError("Укажите сотрудника или ФИО получателя.")
+        return self
 
 
 class ReversalInput(StockInput):
     reason: str = Field(min_length=1, max_length=1000)
+
+
+class EquipmentDocumentLineInput(StockInput):
+    equipment_instance_id: uuid.UUID
+
+
+class EquipmentReceiptLineInput(StockInput):
+    inventory_item_id: uuid.UUID
+    serial_number: str | None = Field(default=None, max_length=200)
+    inventory_number: str | None = Field(default=None, max_length=200)
+
+    @field_validator("serial_number", "inventory_number")
+    @classmethod
+    def trim_identifiers(cls, value):
+        return value.strip() if value is not None and value.strip() else None
+
+
+class MixedDocumentInput(StockInput):
+    document_date: date
+    comment: str = Field(default="", max_length=2000)
+    items: list[DocumentLineInput] = Field(default_factory=list, max_length=100)
+    equipment_instances: list[EquipmentDocumentLineInput] = Field(
+        default_factory=list, max_length=100
+    )
+
+    @field_validator("items")
+    @classmethod
+    def unique_items(cls, values):
+        if len({line.inventory_item_id for line in values}) != len(values):
+            raise ValueError("Позиция не может повторяться в одном документе.")
+        return values
+
+    @field_validator("equipment_instances")
+    @classmethod
+    def unique_equipment(cls, values):
+        identifiers = {
+            getattr(line, "equipment_instance_id", None)
+            or getattr(line, "inventory_item_id", None)
+            or (line.serial_number, line.inventory_number)
+            for line in values
+        }
+        if len(identifiers) != len(values):
+            raise ValueError("Экземпляр не может повторяться в одном документе.")
+        return values
+
+    @model_validator(mode="after")
+    def require_line(self):
+        if not self.items and not self.equipment_instances:
+            raise ValueError("Документ должен содержать хотя бы одну строку.")
+        return self
+
+
+class MixedReceiptInput(MixedDocumentInput):
+    receipt_purpose: Literal["delivery", "opening_balance"] = "delivery"
+    external_number: str | None = Field(default=None, max_length=100)
+    supplier_name: str | None = Field(default=None, max_length=200)
+    equipment_instances: list[EquipmentReceiptLineInput] = Field(
+        default_factory=list, max_length=100
+    )
+
+
+class MixedIssueInput(MixedDocumentInput):
+    recipient_employee_id: uuid.UUID | None = None
+    recipient_name: str | None = Field(default=None, max_length=300)
+    recipient_building: str | None = Field(default=None, max_length=200)
+    recipient_department: str | None = Field(default=None, max_length=200)
+    recipient_room: str | None = Field(default=None, max_length=100)
+
+    @field_validator(
+        "recipient_name", "recipient_building", "recipient_department", "recipient_room"
+    )
+    @classmethod
+    def trim_recipient_fields(cls, value):
+        return value.strip() if value is not None else value
+
+    @model_validator(mode="after")
+    def recipient_required(self):
+        if self.recipient_employee_id is None and not self.recipient_name:
+            raise ValueError("Укажите сотрудника или ФИО получателя.")
+        return self

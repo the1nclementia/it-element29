@@ -1,34 +1,59 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ExportButton } from './ExportButton';
 import {
   EmptyState,
   ErrorState,
   LoadingState,
   Field,
-  StatusBadge,
 } from '../../components/common';
 import { Input, Select } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { useList, useOptions, sameOriginPhoto } from './api';
+import { useList, useOptions } from './api';
 import { Pagination } from './shared';
+import {
+  CatalogItemsView,
+  CatalogViewSwitcher,
+  type CatalogViewMode,
+} from './CatalogView';
 import type {
   InventoryItem,
   Manufacturer,
   Category,
   PrinterModel,
 } from './types';
+
+const VIEW_KEY = 'warehouse.catalog.view';
+function readViewMode(): CatalogViewMode {
+  const value = window.localStorage.getItem(VIEW_KEY);
+  return value === 'list' || value === 'table' || value === 'cards'
+    ? value
+    : 'cards';
+}
+
 export function Catalog({
   onAdd,
   disabled = false,
   compact = false,
+  basketCount,
 }: {
   onAdd?: (item: InventoryItem) => void;
   disabled?: boolean;
   compact?: boolean;
+  basketCount?: number;
 }) {
+  const [parameters] = useSearchParams();
+  const [viewMode, setViewMode] = useState<CatalogViewMode>(readViewMode);
+  const [filtersOpen, setFiltersOpen] = useState(
+    () => parameters.get('low_stock') === 'true',
+  );
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<Record<string, string>>(
+    !compact && parameters.get('low_stock') === 'true'
+      ? { low_stock: 'true' }
+      : {},
+  );
   const items = useList<InventoryItem>('/inventory/items', {
     q,
     offset: page * 20,
@@ -39,12 +64,32 @@ export function Catalog({
   const categories = useOptions<Category>('/inventory/categories');
   const manufacturers = useOptions<Manufacturer>('/inventory/manufacturers');
   const printers = useOptions<PrinterModel>('/inventory/printer-models');
+  useEffect(() => {
+    if (!compact) window.localStorage.setItem(VIEW_KEY, viewMode);
+  }, [compact, viewMode]);
   const filter = (name: string, value: string) => {
     setFilters((previous) => ({ ...previous, [name]: value }));
     setPage(0);
   };
+  const activeFilterCount = useMemo(
+    () =>
+      Object.entries(filters).filter(
+        ([name, value]) => value && !(name === 'archived' && value === 'false'),
+      ).length,
+    [filters],
+  );
   return (
     <section className="min-w-0 rounded-xl border border-border bg-white">
+      {basketCount !== undefined && (
+        <div
+          data-testid="catalog-sticky-actions"
+          className="sticky top-0 z-20 flex justify-end border-b border-border bg-white/95 p-3 backdrop-blur"
+        >
+          <Button variant="outline" asChild>
+            <Link to="/issues">Корзина ({basketCount})</Link>
+          </Button>
+        </div>
+      )}
       <div className="space-y-4 border-b border-border p-5">
         <Field label="Поиск позиций">
           {(id) => (
@@ -61,6 +106,24 @@ export function Catalog({
           )}
         </Field>
         {!compact && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium">Позиции склада</p>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
+                {activeFilterCount > 0 && ` (${activeFilterCount})`}
+              </Button>
+              <CatalogViewSwitcher value={viewMode} onChange={setViewMode} />
+            </div>
+          </div>
+        )}
+        {!compact && filtersOpen && (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <Field label="Категория">
               {(id) => (
@@ -167,9 +230,16 @@ export function Catalog({
                   filter('low_stock', e.target.checked ? 'true' : '')
                 }
               />
-              Ниже минимального остатка
+              Требуют пополнения
             </label>
           </div>
+        )}
+        {!compact && (
+          <ExportButton
+            kind="balances"
+            parameters={{ q, ...filters }}
+            label="Скачать остатки в Excel"
+          />
         )}
         {[categories.error, manufacturers.error, printers.error]
           .filter(Boolean)
@@ -196,57 +266,12 @@ export function Catalog({
           description="Измените фильтры или добавьте первую складскую позицию."
         />
       ) : (
-        <ul className="divide-y divide-border">
-          {items.data.items.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-center gap-4 p-5">
-              {sameOriginPhoto(item.primary_photo_url) && (
-                <img
-                  className="size-16 shrink-0 rounded-lg border border-border object-contain"
-                  src={sameOriginPhoto(item.primary_photo_url)}
-                  alt={`Фото ${item.internal_code}`}
-                />
-              )}
-              <div className="min-w-0 flex-1 basis-40">
-                <Link
-                  className="break-words font-semibold text-primary hover:underline"
-                  to={`/inventory/items/${item.id}`}
-                >
-                  {item.model}
-                </Link>
-                <p className="mt-1 break-words text-xs text-muted">
-                  {item.internal_code} · {item.manufacturer_name} ·{' '}
-                  {item.category_name}
-                </p>
-                {item.archived_at && (
-                  <StatusBadge active={false}>Архив</StatusBadge>
-                )}
-              </div>
-              <div className="text-sm">
-                <p
-                  className="font-semibold"
-                  aria-label={`Остаток ${item.internal_code}`}
-                >
-                  {item.balance} шт.
-                </p>
-                {item.is_low_stock && (
-                  <p className="text-xs text-orange-700">
-                    Ниже минимума {item.min_stock}
-                  </p>
-                )}
-              </div>
-              {onAdd && !item.archived_at && (
-                <Button
-                  variant="outline"
-                  disabled={disabled}
-                  aria-label={`Добавить в корзину ${item.internal_code}`}
-                  onClick={() => onAdd(item)}
-                >
-                  Добавить
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
+        <CatalogItemsView
+          items={items.data.items}
+          mode={compact ? 'list' : viewMode}
+          onAdd={onAdd}
+          disabled={disabled}
+        />
       )}
       <Pagination
         page={page}

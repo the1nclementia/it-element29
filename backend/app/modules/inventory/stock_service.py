@@ -29,10 +29,37 @@ from app.modules.inventory.stock_schemas import IssueInput, ReceiptInput, Revers
 MAX_BALANCE = 9_007_199_254_740_991
 
 
+def ensure_cancellable_document_type(document_type: str) -> None:
+    if document_type == "transfer":
+        fail(
+            409,
+            "transfer_cancel_not_supported",
+            "Перемещение нельзя отменить складским документом. "
+            "Используйте отдельную операцию обратного перемещения.",
+        )
+
+
 def request_hash(payload: dict) -> str:
     normalized = dict(payload)
+    # New optional metadata must not invalidate idempotency keys issued before 0005.
+    for field in (
+        "supplier_name",
+        "recipient_name",
+        "recipient_building",
+        "recipient_department",
+        "recipient_room",
+    ):
+        if normalized.get(field) is None:
+            normalized.pop(field, None)
     if "items" in normalized:
-        normalized["items"] = sorted(normalized["items"], key=lambda row: row["inventory_item_id"])
+        item_key = (
+            "inventory_item_id"
+            if all("inventory_item_id" in row for row in normalized["items"])
+            else "equipment_instance_id"
+        )
+        normalized["items"] = sorted(
+            normalized["items"], key=lambda row: str(row.get(item_key, ""))
+        )
     return hashlib.sha256(
         json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     ).hexdigest()
@@ -192,17 +219,35 @@ def conduct(
         return previous, False
     recipient = {}
     if issue:
-        employee, department = lock_recipient(session, payload.recipient_employee_id)
-        recipient = {
-            "recipient_employee_id": employee.id,
-            "recipient_name": employee.full_name,
-            "recipient_personnel_number": employee.personnel_number,
-            "recipient_department": department.name,
-        }
+        if payload.recipient_employee_id is not None:
+            employee, department = lock_recipient(session, payload.recipient_employee_id)
+            recipient = {
+                "recipient_employee_id": employee.id,
+                "recipient_name": employee.full_name,
+                "recipient_personnel_number": employee.personnel_number,
+                "recipient_department": department.name,
+                "recipient_building": payload.recipient_building,
+                "recipient_room": payload.recipient_room,
+            }
+        else:
+            recipient = {
+                "recipient_employee_id": None,
+                "recipient_name": payload.recipient_name,
+                "recipient_personnel_number": None,
+                "recipient_department": payload.recipient_department,
+                "recipient_building": payload.recipient_building,
+                "recipient_room": payload.recipient_room,
+            }
     items = lock_items(session, [line.inventory_item_id for line in payload.items])
     revalidate_mutation(session, actor, session_hash, permission)
     if any(item.archived_at for item in items.values()):
         fail(409, "item_archived", "Архивную позицию нельзя использовать в новом документе.")
+    if any(item.accounting_mode != "quantity" for item in items.values()):
+        fail(
+            409,
+            "serialized_item_requires_instance_document",
+            "Поэкземплярные позиции проводятся отдельной операцией с физическими экземплярами.",
+        )
     deltas = {
         line.inventory_item_id: line.quantity * (-1 if issue else 1) for line in payload.items
     }
@@ -217,6 +262,7 @@ def conduct(
         request_hash=fingerprint,
         receipt_purpose=None if issue else payload.receipt_purpose,
         external_number=None if issue else payload.external_number,
+        supplier_name=None if issue else payload.supplier_name,
         **recipient,
     )
     for index, line in enumerate(payload.items, 1):
@@ -255,13 +301,14 @@ def cancel(
     payload: ReversalInput,
 ) -> tuple[dict, bool]:
     fingerprint = request_hash({**payload.model_dump(mode="json"), "document_id": str(document_id)})
+    original = get_document(session, document_id)
+    ensure_cancellable_document_type(original.document_type)
     lock_command(session, actor.id, "reversal", key)
     previous = replay(
         session, actor, session_hash, "reversal", key, fingerprint, "inventory.manage"
     )
     if previous is not None:
         return previous, False
-    original = get_document(session, document_id)
     if original.document_type == "reversal":
         fail(409, "reversal_not_allowed", "Отмена документа отмены не допускается.")
     lines = session.execute(
@@ -292,6 +339,9 @@ def cancel(
         recipient_name=original.recipient_name,
         recipient_personnel_number=original.recipient_personnel_number,
         recipient_department=original.recipient_department,
+        recipient_room=original.recipient_room,
+        recipient_building=original.recipient_building,
+        supplier_name=original.supplier_name,
     )
     for line, movement in lines:
         item = items[line.inventory_item_id]

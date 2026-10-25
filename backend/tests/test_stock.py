@@ -104,7 +104,8 @@ def post(browser, command, items, *, employee=None, key=None, **fields):
         **fields,
     }
     if command == "issues":
-        data["recipient_employee_id"] = employee
+        if employee is not None:
+            data["recipient_employee_id"] = employee
     return browser.post(f"/api/v1/inventory/{command}", headers=headers(browser, key), json=data)
 
 
@@ -213,7 +214,8 @@ def wait_for_locks(blocker, count):
     while (
         blocker.scalar(
             text(
-                "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND pid<>pg_backend_pid()"
+                "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() "
+                "AND wait_event_type='Lock' AND pid<>pg_backend_pid()"
             )
         )
         < count
@@ -407,6 +409,28 @@ def test_history_snapshots_and_restore_archived_item(stock):
     assert balance(engine, ids["items"][0]) == 3
 
 
+def test_manual_recipient_issue_preserves_text_snapshots_without_employee(stock):
+    browser, engine, _, ids = stock
+    receive(stock, (2, 2))
+    response = post(
+        browser,
+        "issues",
+        [(ids["items"][0], 1)],
+        employee=None,
+        recipient_name="  Ручной получатель  ",
+        recipient_building=" Корпус А ",
+        recipient_department=" ИТ ",
+        recipient_room=" 305 ",
+    )
+    assert response.status_code == 201, response.text
+    document = response.json()
+    assert document["recipient_employee_id"] is None
+    assert document["recipient_name"] == "Ручной получатель"
+    assert document["recipient_building"] == "Корпус А"
+    assert document["recipient_department"] == "ИТ"
+    assert document["recipient_room"] == "305"
+
+
 def test_runtime_cannot_mutate_ledger_and_dashboard_uses_real_stock(stock):
     browser, engine, settings, ids = stock
     receive(stock, (10, 1))
@@ -414,7 +438,8 @@ def test_runtime_cannot_mutate_ledger_and_dashboard_uses_real_stock(stock):
     assert metrics["cartridge_balance"]["value"] == 11
     assert metrics["low_stock"]["value"] == 1
     assert metrics["issues_today"]["value"] == 0
-    assert metrics["equipment_total"]["value"] is None
+    assert metrics["equipment_total"]["value"] == 0
+    assert metrics["equipment_total"]["available"] is True
     with engine.connect() as connection:
         for table in [
             "inventory_documents",

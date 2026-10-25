@@ -69,7 +69,8 @@ def documents(
     session: Database,
     offset: Offset = 0,
     limit: Limit = 20,
-    document_type: Literal["receipt", "issue", "reversal"] | None = None,
+    document_type: Literal["receipt", "issue", "reversal", "return", "replacement", "transfer"]
+    | None = None,
     recipient_employee_id: uuid.UUID | None = None,
     created_by_id: uuid.UUID | None = None,
     date_from: date | None = None,

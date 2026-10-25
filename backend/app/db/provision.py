@@ -76,6 +76,7 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
                 "inventory_categories",
                 "printer_models",
                 "inventory_items",
+                "equipment_instances",
                 "inventory_compatibilities",
                 "inventory_item_attachments",
                 "inventory_drafts",
@@ -89,6 +90,8 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
                 "inventory_documents",
                 "inventory_document_items",
                 "inventory_movements",
+                "equipment_movements",
+                "inventory_document_equipment",
                 "file_attachments",
             ],
         ),
@@ -102,7 +105,8 @@ def provision_runtime_role(connection: Connection, role: str, password: str) -> 
         )
 
     execute(
-        sql.SQL("GRANT USAGE ON SEQUENCE inventory_document_number_seq TO {}").format(
-            sql.Identifier(role)
-        )
+        sql.SQL(
+            "GRANT USAGE ON SEQUENCE inventory_document_number_seq, "
+            "inventory_category_code_seq, inventory_item_code_seq TO {}"
+        ).format(sql.Identifier(role))
     )

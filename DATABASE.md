@@ -40,17 +40,34 @@ UPDATE. Прямой SQL-писатель обязан обновить updated_
 Все временные поля — timestamptz UTC. Аудит содержит только разрешённые поля изменений,
 никогда пароль, хеш пароля, bearer/CSRF-токен или тело запроса целиком.
 
+## Физическая схема этапа 3
+
+`0003_inventory` добавляет каталог, склад и фотографии; `0004_inventory_drafts` —
+личные черновики. Выпущенные ревизии не редактируются.
+
+| Таблицы | Назначение и инварианты |
+|---|---|
+| manufacturers, inventory_categories, printer_models | справочники, нормализация ключей, архивирование, optimistic version |
+| inventory_items, inventory_compatibilities | код, артикул, модель, категория, производитель, min_stock; M:N совместимость |
+| inventory_documents, inventory_document_items | receipt/issue/reversal, автор, дата, снимки получателя/подразделения/номенклатуры, idempotency key + hash; положительные количества |
+| inventory_movements | signed delta, ссылка на документ и строку; единственный источник остатка, runtime без UPDATE/DELETE |
+| inventory_drafts | автор, тип, частичный payload JSONB, version, статус и ссылка на проведённый документ |
+| file_attachments, inventory_item_attachments | безопасный storage_key, media_type, размер, SHA256, загрузивший; основное фото и архивные связи |
+
+Новая forward-миграция `0005_inventory_document_details` добавляет nullable снимки поставщика
+`supplier_name` и кабинета получателя `recipient_room`; старые документы не требуют
+выдуманных значений. До обновления действующего стенда обязательна проверенная копия
+БД и файлов. Тесты применяют миграции только к новым изолированным БД.
+
 ## Целевая схема последующих этапов — ещё НЕ мигрирована
 
 | Этап | Сущности | Назначение и ключевые связи |
 |---|---|---|
-| 3 | manufacturers, inventory_categories, printer_models, inventory_items, inventory_compatibilities | модель не глобально уникальна; производитель расходника отдельно от производителя принтера; M:N совместимость |
-| 3 | issue_documents, issue_document_items, inventory_movements | получатель FK employees, автор FK users; qty строк >0; signed delta движений !=0; ссылки на документ и строку; тип receipt/issue/return/adjustment/reversal |
 | 4 | equipment_categories, equipment, equipment_links | serial_number nullable и индексируется, inventory_number UNIQUE nullable; category_id, location_id, responsible_employee_id, department_id, status, attributes JSONB |
 | 5 | equipment_movements, equipment_movement_items | документ и несколько equipment_id; снимки from/to location, employee, department; UUID устройств, причина, автор, occurred_at; отмена отдельным документом |
 | 6 | maintenance_records, maintenance_revisions | equipment_id, work_type, status, scheduled/completed_at, description, work_done, executor_id; версии содержат изменённые поля |
-| 3+ | file_attachments и типизированные таблицы связей | storage_key UUID, media_type, size, hash, uploader; FK к владельцу через inventory_item_attachments/equipment_attachments, а не незащищённый polymorphic FK |
-| 3+ | расширение audit_logs | аудит документов/оборудования добавляется вместе с реальными бизнес-операциями |
+| 4+ | equipment_attachments | типизированные FK связи с существующим файловым хранилищем |
+| 4+ | расширение audit_logs | аудит оборудования добавляется вместе с реальными бизнес-операциями |
 | позже | import_batches, import_rows | staging, mapping, errors, confirmation, source hash; импорт GLPI.xlsx только после предпросмотра и подтверждения |
 
 ```mermaid

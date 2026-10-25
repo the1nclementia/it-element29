@@ -19,6 +19,9 @@ import { Inventory } from './pages/Inventory';
 import { ItemDetails } from './pages/ItemDetails';
 import { Documents, DocumentDetails } from './pages/Documents';
 import { Directory } from './pages/Directory';
+import { Reports } from './pages/Reports';
+import { Equipment } from './pages/Equipment';
+import { Movements } from './pages/Movements';
 import { Drafts } from './pages/Drafts';
 import { StockForm } from './features/issues/StockForm';
 import { WarehouseProvider } from './features/issues/state';
@@ -27,14 +30,19 @@ export function ProtectedRoute({
   permission,
 }: {
   children: ReactNode;
-  permission?: string;
+  permission?: string | string[];
 }) {
   const { user } = useAuth();
   const location = useLocation();
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password && location.pathname !== '/settings')
     return <Navigate to="/settings" replace />;
-  if (permission && !user.permissions.includes(permission))
+  if (
+    permission &&
+    !(Array.isArray(permission) ? permission : [permission]).some((value) =>
+      user.permissions.includes(value),
+    )
+  )
     return (
       <ErrorState
         error={
@@ -130,6 +138,22 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="equipment"
+            element={
+              <ProtectedRoute permission="equipment.read">
+                <Equipment />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="movements"
+            element={
+              <ProtectedRoute permission="movements.read">
+                <Movements />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="inventory/catalogs"
             element={
               <ProtectedRoute permission="inventory.read">
@@ -145,7 +169,32 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
-        <Route path="inventory/drafts" element={<ProtectedRoute permission="inventory.issue"><Drafts/></ProtectedRoute>}/>
+          <Route
+            path="history"
+            element={
+              <ProtectedRoute permission="inventory.read">
+                <Documents />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <ProtectedRoute permission="inventory.read">
+                <Reports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/drafts"
+            element={
+              <ProtectedRoute
+                permission={['inventory.issue', 'inventory.manage']}
+              >
+                <Drafts />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="inventory/documents/:id"
             element={
@@ -188,6 +237,12 @@ export function AppRoutes() {
                   '/inventory',
                   '/issues',
                   '/directory',
+                  '/inventory/drafts',
+                  '/inventory/receipt',
+                  '/history',
+                  '/reports',
+                  '/equipment',
+                  '/movements',
                 ].includes(module.path),
             )
             .map((module) => (

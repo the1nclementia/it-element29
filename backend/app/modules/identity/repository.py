@@ -48,6 +48,53 @@ def audit(
     # Only these non-secret fields may enter an audit record, including nested values.
     allowed = {"display_name", "role", "is_active", "username", "must_change_password"}
     safe = {key: value for key, value in (changes or {}).items() if key in allowed}
+    if action.startswith("inventory.") and changes:
+        # Record field names, never free-text catalogue values or uploaded content.
+        catalog_fields = {
+            "name",
+            "code",
+            "manufacturer_id",
+            "model",
+            "category_id",
+            "internal_code",
+            "article",
+            "description",
+            "min_stock",
+            "accounting_mode",
+            "item_type",
+        }
+        fields = changes.get("fields")
+        if isinstance(fields, list):
+            safe["fields"] = [
+                field for field in fields if isinstance(field, str) and field in catalog_fields
+            ]
+        model_ids = changes.get("printer_model_ids")
+        if isinstance(model_ids, list):
+            safe["printer_model_ids"] = []
+            for value in model_ids:
+                if isinstance(value, str):
+                    try:
+                        safe["printer_model_ids"].append(str(uuid.UUID(value)))
+                    except ValueError:
+                        continue
+    if action.startswith("equipment.") and changes:
+        fields = changes.get("fields")
+        if isinstance(fields, list):
+            safe["fields"] = [
+                field
+                for field in fields
+                if isinstance(field, str)
+                and field
+                in {
+                    "serial_number",
+                    "inventory_number",
+                    "current_building",
+                    "current_room",
+                    "current_department",
+                    "current_recipient",
+                    "is_under_repair",
+                }
+            ]
     session.add(AuditLog(actor_id=actor_id, action=action, target_id=target_id, changes=safe))
 
 

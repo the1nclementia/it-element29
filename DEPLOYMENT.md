@@ -1,6 +1,6 @@
 # Развёртывание на Ubuntu 24.04
 
-Используется отдельный `deploy/compose.yaml`; корневой `docker-compose.yml` предназначен для разработки. Серверные контуры `staging` и `production` имеют разные Compose projects, внешние volumes, state, секреты, DNS и сертификаты. Внутри staging также действуют production security settings. Выпуск включает этап 3: миграции `0003_inventory` и `0004_inventory_drafts`, склад, фотографии и личные черновики. Этапы 4–8 не включены.
+Используется отдельный `deploy/compose.yaml`; корневой `docker-compose.yml` предназначен для разработки. Серверные контуры `staging` и `production` имеют разные Compose projects, внешние volumes, state, секреты, DNS и сертификаты. Внутри staging также действуют production security settings. Выпуск включает этап 3: миграции `0003_inventory`, `0004_inventory_drafts` и `0005_inventory_document_details`, склад, реквизиты поступления и кабинет получателя, фотографии и личные черновики. Этапы 4–8 не включены.
 
 ## 1. Подготовить сервер и сеть
 

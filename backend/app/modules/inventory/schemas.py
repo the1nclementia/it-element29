@@ -1,6 +1,6 @@
 import re
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
 
@@ -37,12 +37,14 @@ class ManufacturerPatch(VersionInput):
 
 
 class CategoryCreate(CatalogInput):
-    code: Code
+    code: Code | None = None
     name: Name
 
-    @field_validator("code")
+    @field_validator("code", mode="before")
     @classmethod
     def category_code(cls, value):
+        if value is None:
+            return value
         value = value.lower()
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", value):
             raise ValueError("Код категории: латинские буквы, цифры, дефис или подчёркивание")
@@ -70,15 +72,27 @@ class ItemFields(CatalogInput):
     article: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
     description: str = Field(default="", max_length=5000)
     min_stock: int = Field(default=0, strict=True, ge=0, le=9_007_199_254_740_991)
+    accounting_mode: Literal["quantity", "serialized"] = "quantity"
+    item_type: Literal["cartridge", "consumable", "monitor", "computer", "printer"] = "cartridge"
+
+    @model_validator(mode="after")
+    def serialized_has_equipment_type(self):
+        if self.accounting_mode == "serialized" and self.item_type not in {
+            "monitor",
+            "computer",
+            "printer",
+        }:
+            raise ValueError("Для поэкземплярного учёта выберите тип оборудования.")
+        return self
 
 
 class ItemCreate(ItemFields):
-    internal_code: Code
+    internal_code: Code | None = None
 
     @field_validator("internal_code")
     @classmethod
     def uppercase_code(cls, value):
-        return value.upper()
+        return value.upper() if value is not None else value
 
 
 class ItemPatch(VersionInput):
@@ -88,6 +102,14 @@ class ItemPatch(VersionInput):
     article: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
     description: str | None = Field(default=None, max_length=5000)
     min_stock: int | None = Field(default=None, strict=True, ge=0, le=9_007_199_254_740_991)
+    accounting_mode: Literal["quantity", "serialized"] | None = None
+    item_type: Literal["cartridge", "consumable", "monitor", "computer", "printer"] | None = None
+
+    @model_validator(mode="after")
+    def validate_serialized_type(self):
+        if self.accounting_mode == "serialized" and self.item_type in {"cartridge", "consumable"}:
+            raise ValueError("Для поэкземплярного учёта выберите тип оборудования.")
+        return self
 
 
 class CompatibilitiesInput(VersionInput):
