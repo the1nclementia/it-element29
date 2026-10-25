@@ -75,7 +75,6 @@ a {
   outline-offset: 3px;
 }
 .brand-window {
-  position: relative;
   display: flex;
   align-items: center;
   width: 196px;
@@ -87,25 +86,6 @@ a {
   display: block;
   width: 100%;
   height: auto;
-}
-.brand-window .brand-wordmark-base {
-  filter: grayscale(1) brightness(0.16);
-}
-.brand-window .brand-wordmark-bracket {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  bottom: auto;
-  left: 0;
-  height: auto;
-  transform: translateY(-50%);
-  filter: none;
-}
-.brand-window .brand-wordmark-bracket-left {
-  clip-path: inset(0 20.5% 0 76.5%);
-}
-.brand-window .brand-wordmark-bracket-right {
-  clip-path: inset(0 0 0 97.5%);
 }
 .brand-mark {
   width: 40px;

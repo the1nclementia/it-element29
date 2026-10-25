@@ -160,23 +160,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
     </span>
   ) : (
     <span className="brand-window">
-      <img
-        className="brand-wordmark-base"
-        src="/brand/wordmark-transparent.png"
-        alt="ИТ-элемент [29]"
-      />
-      <img
-        className="brand-wordmark-bracket brand-wordmark-bracket-left"
-        src="/brand/wordmark-transparent.png"
-        alt=""
-        aria-hidden="true"
-      />
-      <img
-        className="brand-wordmark-bracket brand-wordmark-bracket-right"
-        src="/brand/wordmark-transparent.png"
-        alt=""
-        aria-hidden="true"
-      />
+      <img src="/brand/wordmark-login.svg" alt="ИТ-элемент [29]" />
     </span>
   );
 }
