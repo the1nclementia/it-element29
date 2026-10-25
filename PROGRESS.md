@@ -539,3 +539,6 @@ root-права/владельцы каталогов, flock, systemd, SSH, вн
   с async decoding и остаётся декоративным (`pointer-events: none`). `tsc -b` и
   Prettier проходят; focused Vitest повторно заблокирован `spawn EPERM` при старте
   esbuild.
+- После запуска Vitest с разрешением на esbuild focused suite прошёл: `2 files,
+  23 tests passed` (`login-hero.test.tsx`, `app.test.tsx`). Проверка `tsc -b` и
+  Prettier также прошли из каталога `frontend`.
