@@ -82,7 +82,7 @@ export function Login() {
     }
   }
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
+    <div className="grid min-h-dvh lg:grid-cols-[1.55fr_1fr]">
       <section className="login-hero relative hidden overflow-hidden px-16 py-12 text-[#2F0F0F] lg:flex lg:flex-col">
         <div
           className="login-hero-fallback absolute inset-0"
@@ -108,7 +108,7 @@ export function Login() {
             </LoginHeroErrorBoundary>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#FBFAFA]/95 via-[#FBFAFA]/35 to-transparent" />
+        <div className="login-hero-wash absolute inset-0" />
         <div className="relative">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#2F0F0F]/10 bg-white/70 px-3 py-1.5 text-xs text-[#2F0F0F] shadow-sm backdrop-blur">
             <span className="size-1.5 rounded-full bg-[#FF6F1C]" />
@@ -116,7 +116,7 @@ export function Login() {
           </span>
         </div>
         <div className="relative my-auto max-w-lg py-20">
-          <div className="mb-8 flex size-14 items-center justify-center rounded-2xl border border-white/15 bg-white/5">
+          <div className="mb-8 flex size-14 items-center justify-center rounded-2xl border border-white/80 bg-white/85 shadow-sm">
             <Layers3 className="size-7 text-[#FF6F1C]" strokeWidth={1.5} />
           </div>
           <h1 className="text-[44px] font-semibold leading-[1.2] tracking-tight">
@@ -124,7 +124,7 @@ export function Login() {
             <br />
             <span className="text-[#FF6F1C]">Всё на своих местах.</span>
           </h1>
-          <p className="mt-6 max-w-sm text-base leading-7 text-slate-300">
+          <p className="mt-6 max-w-sm text-base leading-7 text-[#6F6D6D]">
             Единое пространство для команды: оборудование, расходные материалы и
             управление доступом.
           </p>

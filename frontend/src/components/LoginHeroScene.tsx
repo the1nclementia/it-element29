@@ -7,57 +7,61 @@ function StaticComposition() {
   const seam = {
     color: '#ff6f1c',
     emissive: '#ff5a0a',
-    emissiveIntensity: 2.6,
+    emissiveIntensity: 0.72,
   };
   return (
     <>
-      <color attach="background" args={['#eee7e2']} />
-      <ambientLight intensity={1.8} color="#fff8f1" />
-      <directionalLight position={[-4, 6, 5]} intensity={4} color="#fff4ea" />
+      <color attach="background" args={['#f4eeea']} />
+      <ambientLight intensity={2.1} color="#fffaf6" />
+      <directionalLight position={[-4, 6, 5]} intensity={2.2} color="#fff8f2" />
       <pointLight
-        position={[2, -1, 3]}
-        intensity={18}
-        distance={9}
+        position={[1.8, -1, 2.2]}
+        intensity={5}
+        distance={7}
         color="#ff7a2f"
       />
-      <mesh position={[0, 0, -1.8]} rotation={[0, 0, -0.05]}>
-        <boxGeometry args={[7.4, 3.2, 0.35]} />
+      <mesh position={[-0.45, 1.25, -1.8]} rotation={[0, 0, -0.16]}>
+        <boxGeometry args={[8.2, 1.35, 0.42]} />
         <meshStandardMaterial
-          color="#e9e5e1"
-          metalness={0.72}
-          roughness={0.28}
+          color="#eee9e5"
+          metalness={0.42}
+          roughness={0.42}
         />
       </mesh>
-      <mesh position={[2.4, -0.75, -0.4]} rotation={[0.08, -0.16, -0.02]}>
-        <boxGeometry args={[3.2, 2.6, 1.5]} />
+      <mesh position={[-0.1, -1.5, -1.1]} rotation={[0.02, -0.16, -0.16]}>
+        <boxGeometry args={[8.6, 1.95, 1.0]} />
         <meshStandardMaterial
-          color="#f4f0ec"
-          metalness={0.82}
-          roughness={0.24}
+          color="#e9e4e0"
+          metalness={0.55}
+          roughness={0.36}
         />
       </mesh>
-      <mesh position={[-2.2, 0.8, 0.2]} rotation={[-0.08, 0.22, 0.03]}>
-        <boxGeometry args={[3.6, 1.5, 1.25]} />
+      <mesh position={[0.2, -0.05, -0.25]} rotation={[-0.04, -0.2, -0.06]}>
+        <boxGeometry args={[4.5, 1.95, 1.45]} />
         <meshStandardMaterial
-          color="#faf8f4"
-          metalness={0.76}
-          roughness={0.26}
+          color="#f7f4f1"
+          metalness={0.48}
+          roughness={0.34}
         />
       </mesh>
-      <mesh position={[0.6, 0.1, 1.0]} rotation={[0, -0.12, 0.02]}>
-        <boxGeometry args={[4.2, 1.7, 0.42]} />
-        <meshStandardMaterial color="#e4dfda" metalness={0.7} roughness={0.3} />
+      <mesh position={[-2.75, -0.15, -0.2]} rotation={[0, -0.2, -0.06]}>
+        <boxGeometry args={[4.5, 2.7, 0.5]} />
+        <meshStandardMaterial
+          color="#ede8e4"
+          metalness={0.42}
+          roughness={0.42}
+        />
       </mesh>
-      <mesh position={[0.85, -0.76, 1.78]} rotation={[0, 0, 0.02]}>
-        <boxGeometry args={[4.6, 0.045, 0.045]} />
+      <mesh position={[-0.15, -1.45, 0.02]} rotation={[0, 0, -0.12]}>
+        <boxGeometry args={[7.5, 0.026, 0.026]} />
         <meshStandardMaterial {...seam} />
       </mesh>
-      <mesh position={[2.4, 0.03, 1.78]} rotation={[0, 0, Math.PI / 2]}>
-        <boxGeometry args={[2.15, 0.045, 0.045]} />
+      <mesh position={[1.95, -0.1, 0.03]} rotation={[0, 0, Math.PI / 2 - 0.08]}>
+        <boxGeometry args={[2.55, 0.025, 0.025]} />
         <meshStandardMaterial {...seam} />
       </mesh>
-      <mesh position={[-1.25, 0.82, 1.78]} rotation={[0, 0, -0.02]}>
-        <boxGeometry args={[2.8, 0.035, 0.035]} />
+      <mesh position={[-1.8, 1.25, 0.04]} rotation={[0, 0, -0.16]}>
+        <boxGeometry args={[2.9, 0.022, 0.022]} />
         <meshStandardMaterial {...seam} />
       </mesh>
     </>
@@ -81,7 +85,7 @@ export function LoginHeroScene({ onFallback, onReady }: Props) {
       <Canvas
         dpr={[1, 1.25]}
         frameloop="demand"
-        camera={{ position: [0, 0.2, 8], fov: 34 }}
+        camera={{ position: [0, 0.05, 8.5], fov: 40 }}
         gl={{
           antialias: true,
           alpha: true,
