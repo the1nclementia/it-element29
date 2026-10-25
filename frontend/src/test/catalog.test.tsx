@@ -164,6 +164,9 @@ it('показывает карточки по умолчанию и сохра�
   await screen.findByRole('link', { name: 'Позиция для проверки' });
   const search = screen.getByLabelText('Поиск позиций');
   await events.type(search, 'CAT');
+  expect(screen.queryByLabelText('Категория')).not.toBeInTheDocument();
+  await events.click(screen.getByRole('button', { name: 'Фильтры' }));
+  expect(screen.getByLabelText('Категория')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Плитка' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -196,9 +199,9 @@ it('восстанавливает сохранённый режим и оста
   ).toHaveAttribute('href', '/issues');
   const basketLink = screen.getByRole('link', { name: 'Корзина (1)' });
   expect(basketLink).toHaveAttribute('href', '/issues');
-  expect(basketLink.closest('[data-testid="catalog-sticky-actions"]')).toHaveClass(
-    'sticky',
-  );
+  expect(
+    basketLink.closest('[data-testid="catalog-sticky-actions"]'),
+  ).toHaveClass('sticky');
 });
 it('stale version сохраняет редактируемую форму и отправляет версию', async () => {
   app('/inventory/items/item1');

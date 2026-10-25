@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ExportButton } from './ExportButton';
 import {
@@ -44,6 +44,9 @@ export function Catalog({
 }) {
   const [parameters] = useSearchParams();
   const [viewMode, setViewMode] = useState<CatalogViewMode>(readViewMode);
+  const [filtersOpen, setFiltersOpen] = useState(
+    () => parameters.get('low_stock') === 'true',
+  );
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState<Record<string, string>>(
@@ -68,6 +71,13 @@ export function Catalog({
     setFilters((previous) => ({ ...previous, [name]: value }));
     setPage(0);
   };
+  const activeFilterCount = useMemo(
+    () =>
+      Object.entries(filters).filter(
+        ([name, value]) => value && !(name === 'archived' && value === 'false'),
+      ).length,
+    [filters],
+  );
   return (
     <section className="min-w-0 rounded-xl border border-border bg-white">
       {basketCount !== undefined && (
@@ -98,10 +108,22 @@ export function Catalog({
         {!compact && (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-medium">Позиции склада</p>
-            <CatalogViewSwitcher value={viewMode} onChange={setViewMode} />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
+                {activeFilterCount > 0 && ` (${activeFilterCount})`}
+              </Button>
+              <CatalogViewSwitcher value={viewMode} onChange={setViewMode} />
+            </div>
           </div>
         )}
-        {!compact && (
+        {!compact && filtersOpen && (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <Field label="Категория">
               {(id) => (
