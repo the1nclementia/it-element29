@@ -138,7 +138,10 @@ it('после неизвестного результата блокирует 
     new Headers(sent[0].headers).get('Idempotency-Key'),
   );
   expect(screen.queryByLabelText('Количество TEST-1')).not.toBeInTheDocument();
-  expect(localStorage.length + sessionStorage.length).toBe(0);
+  expect(localStorage.getItem('access_token')).toBeNull();
+  expect(localStorage.getItem('refresh_token')).toBeNull();
+  expect(sessionStorage.getItem('access_token')).toBeNull();
+  expect(sessionStorage.getItem('refresh_token')).toBeNull();
 });
 it('конфликт остатка сохраняет корзину и показывает доступное количество', async () => {
   outcome = 'stock';

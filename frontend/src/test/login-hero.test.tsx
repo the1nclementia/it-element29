@@ -21,6 +21,16 @@ describe('login hero backdrop', () => {
     expect(onFallback).toHaveBeenCalledOnce();
   });
 
+  it('reveals the artwork only after the image load callback', async () => {
+    const { container } = render(<LoginHeroBackdrop />);
+    const image = container.querySelector('img')!;
+    expect(container.firstElementChild).toHaveClass('login-hero-art-loading');
+    image.dispatchEvent(new Event('load'));
+    await waitFor(() => {
+      expect(container.firstElementChild).toHaveClass('login-hero-art-ready');
+    });
+  });
+
   it('pauses the light sweep while the document is hidden', async () => {
     const { container } = render(<LoginHeroBackdrop />);
     Object.defineProperty(document, 'visibilityState', {

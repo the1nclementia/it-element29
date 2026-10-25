@@ -182,6 +182,9 @@ a {
 .login-hero-art-hidden .login-hero-light-sweep {
   animation-play-state: paused;
 }
+.login-hero-accent {
+  background: var(--brand-apricot);
+}
 @keyframes login-hero-light {
   0%,
   100% {

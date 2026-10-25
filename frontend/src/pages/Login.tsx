@@ -42,32 +42,32 @@ export function Login() {
   }
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.55fr_1fr]">
-      <section className="login-hero relative hidden overflow-hidden px-16 py-12 text-[#2F0F0F] lg:flex lg:flex-col">
+      <section className="login-hero relative hidden overflow-hidden px-16 py-12 text-foreground lg:flex lg:flex-col">
         <LoginHeroErrorBoundary onFallback={() => undefined}>
           <LoginHeroBackdrop />
         </LoginHeroErrorBoundary>
         <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#2F0F0F]/10 bg-white/70 px-3 py-1.5 text-xs text-[#2F0F0F] shadow-sm backdrop-blur">
-            <span className="size-1.5 rounded-full bg-[#FF6F1C]" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-white/70 px-3 py-1.5 text-xs text-foreground shadow-sm backdrop-blur">
+            <span className="size-1.5 rounded-full bg-primary" />
             Корпоративная система учёта
           </span>
         </div>
         <div className="relative my-auto max-w-lg py-20">
           <div className="mb-8 flex size-14 items-center justify-center rounded-2xl border border-white/80 bg-white/85 shadow-sm">
-            <Layers3 className="size-7 text-[#FF6F1C]" strokeWidth={1.5} />
+            <Layers3 className="size-7 text-primary" strokeWidth={1.5} />
           </div>
           <h1 className="text-[44px] font-semibold leading-[1.2] tracking-tight">
             Ваши ИТ-ресурсы.
             <br />
-            <span className="text-[#FF6F1C]">Всё на своих местах.</span>
+            <span className="text-primary">Всё на своих местах.</span>
           </h1>
-          <p className="mt-6 max-w-sm text-base leading-7 text-[#6F6D6D]">
+          <p className="mt-6 max-w-sm text-base leading-7 text-muted">
             Единое пространство для команды: оборудование, расходные материалы и
             управление доступом.
           </p>
-          <div className="mt-10 h-1 w-12 rounded-full bg-orange-400" />
+          <div className="login-hero-accent mt-10 h-1 w-12 rounded-full" />
         </div>
-        <p className="relative text-xs text-[#6F6D6D]">
+        <p className="relative text-xs text-muted">
           ИТ-элемент [29] · Для внутреннего использования
         </p>
       </section>
