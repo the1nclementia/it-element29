@@ -488,7 +488,7 @@ describe('Авторизация и интерфейс', () => {
       screen.getByRole('heading', { name: 'История перемещений' }),
     ).toBeVisible();
     expect(screen.getByLabelText('Здание назначения')).toBeVisible();
-    expect(screen.getByText('Перемещений пока нет')).toBeVisible();
+    expect(await screen.findByText('Перемещений пока нет')).toBeVisible();
   });
   it('истечение сессии на API очищает загруженные данные и открывает вход', async () => {
     const client = app();

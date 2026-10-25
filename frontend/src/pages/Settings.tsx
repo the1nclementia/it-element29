@@ -55,7 +55,7 @@ export function Settings() {
       <div className="grid items-start gap-6 xl:grid-cols-[1.2fr_1fr]">
         <section className="rounded-xl border border-border bg-white p-6">
           <div className="mb-6 flex items-center gap-3">
-            <span className="rounded-lg bg-blue-50 p-2.5 text-primary">
+            <span className="rounded-lg bg-primary-light p-2.5 text-primary">
               <KeyRound className="size-5" />
             </span>
             <div>

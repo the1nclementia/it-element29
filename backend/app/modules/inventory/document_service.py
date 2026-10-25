@@ -8,12 +8,29 @@ from sqlalchemy.orm import Session, aliased
 
 from app.modules.identity.errors import fail
 from app.modules.identity.models import User
+from app.modules.inventory.equipment_document_models import InventoryDocumentEquipment
 from app.modules.inventory.models import (
     InventoryDocument,
     InventoryDocumentItem,
     InventoryItem,
     InventoryMovement,
 )
+
+
+def equipment_item_response(line: InventoryDocumentEquipment) -> dict:
+    return {
+        name: getattr(line, name)
+        for name in (
+            "id",
+            "line_number",
+            "equipment_instance_id",
+            "internal_code",
+            "model",
+            "manufacturer",
+            "serial_number",
+            "inventory_number",
+        )
+    }
 
 
 def document_response(session: Session, document: InventoryDocument) -> dict:
@@ -75,6 +92,14 @@ def document_response(session: Session, document: InventoryDocument) -> dict:
                 )
                 .where(InventoryDocumentItem.document_id == document.id)
                 .order_by(InventoryDocumentItem.line_number)
+            )
+        ],
+        equipment_items=[
+            equipment_item_response(line)
+            for line in session.scalars(
+                select(InventoryDocumentEquipment)
+                .where(InventoryDocumentEquipment.document_id == document.id)
+                .order_by(InventoryDocumentEquipment.line_number)
             )
         ],
     )

@@ -40,13 +40,9 @@ export function StockForm({ kind }: { kind: 'receipt' | 'issue' }) {
     ...(kind === 'issue'
       ? {
           recipient_employee_id: draft.employee || null,
-          ...(draft.employee
-            ? {}
-            : {
-                recipient_name: draft.recipientName || null,
-                recipient_building: draft.recipientBuilding || null,
-                recipient_department: draft.recipientDepartment || null,
-              }),
+          recipient_name: draft.employee ? null : draft.recipientName || null,
+          recipient_building: draft.recipientBuilding || null,
+          recipient_department: draft.recipientDepartment || null,
           recipient_room: draft.room || null,
         }
       : {

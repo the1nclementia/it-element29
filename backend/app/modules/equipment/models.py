@@ -25,6 +25,14 @@ class EquipmentInstance(RecordMixin, Base):
         Index("ix_equipment_instances_active_status", "archived_at", "is_under_repair"),
         Index("ix_equipment_instances_inventory_number_key", "inventory_number_key"),
         Index(
+            "uq_equipment_instances_inventory_number_key",
+            "inventory_number_key",
+            unique=True,
+            postgresql_where=(
+                "inventory_number_key IS NOT NULL AND btrim(inventory_number_key) <> ''"
+            ),
+        ),
+        Index(
             "uq_equipment_instances_manufacturer_serial_key",
             "manufacturer_id",
             "serial_number_key",

@@ -8,8 +8,20 @@ down_revision = "0007_equipment_instances"
 branch_labels = None
 depends_on = None
 
+# Alembic creates this table before running revisions, using VARCHAR(32) by
+# default. This revision name is longer, so widen the column before Alembic
+# records the new revision.
+ALEMBIC_VERSION_COLUMN_LENGTH = 64
+
 
 def upgrade() -> None:
+    op.alter_column(
+        "alembic_version",
+        "version_num",
+        existing_type=sa.String(length=32),
+        type_=sa.String(length=ALEMBIC_VERSION_COLUMN_LENGTH),
+        existing_nullable=False,
+    )
     # The operation is transactional on PostgreSQL: both constraints and the
     # legacy inventory-number index change together with the Alembic revision.
     op.drop_constraint(

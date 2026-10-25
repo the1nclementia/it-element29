@@ -21,6 +21,13 @@ Thumbs.db
 
 # Local frontend dependencies and caches
 frontend/.pnpm-store/
+.pnpm-store/
+
+# Local test runner scratch directories
+.pytest-tmp-*/
+
+# Superseded local login hero draft; production uses the clean background asset
+frontend/public/brand/login-hero.png
 
 # Temporary test backups
 *.py.bak

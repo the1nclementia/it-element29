@@ -29,6 +29,16 @@ from app.modules.inventory.stock_schemas import IssueInput, ReceiptInput, Revers
 MAX_BALANCE = 9_007_199_254_740_991
 
 
+def ensure_cancellable_document_type(document_type: str) -> None:
+    if document_type == "transfer":
+        fail(
+            409,
+            "transfer_cancel_not_supported",
+            "Перемещение нельзя отменить складским документом. "
+            "Используйте отдельную операцию обратного перемещения.",
+        )
+
+
 def request_hash(payload: dict) -> str:
     normalized = dict(payload)
     # New optional metadata must not invalidate idempotency keys issued before 0005.
@@ -291,13 +301,14 @@ def cancel(
     payload: ReversalInput,
 ) -> tuple[dict, bool]:
     fingerprint = request_hash({**payload.model_dump(mode="json"), "document_id": str(document_id)})
+    original = get_document(session, document_id)
+    ensure_cancellable_document_type(original.document_type)
     lock_command(session, actor.id, "reversal", key)
     previous = replay(
         session, actor, session_hash, "reversal", key, fingerprint, "inventory.manage"
     )
     if previous is not None:
         return previous, False
-    original = get_document(session, document_id)
     if original.document_type == "reversal":
         fail(409, "reversal_not_allowed", "Отмена документа отмены не допускается.")
     lines = session.execute(
