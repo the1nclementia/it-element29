@@ -21,7 +21,7 @@ export function Inventory() {
         title="Склад"
         description="Каталог расходных материалов, остатки и история операций"
       >
-        <div className="flex flex-wrap gap-2">
+        <div className="sticky top-3 z-20 flex flex-wrap justify-end gap-2">
           <Button variant="outline" asChild>
             <Link to="/inventory/documents">Документы</Link>
           </Button>
@@ -36,16 +36,19 @@ export function Inventory() {
               <Button onClick={() => setCreate(true)}>Создать позицию</Button>
             </>
           )}
-          {issue && (
-            <Button variant="outline" asChild>
-              <Link to="/issues">Корзина ({basket.draft.lines.length})</Link>
-            </Button>
-          )}
         </div>
       </PageHeader>
       {added && (
         <div className="mb-4">
-          <Notice success>{added} добавлен в корзину.</Notice>
+          <Notice success>
+            <span>
+              Позиция добавлена в корзину{' '}
+              <span className="text-emerald-700">({added})</span>.{' '}
+            </span>
+            <Link className="font-semibold underline" to="/issues">
+              Перейти в корзину
+            </Link>
+          </Notice>
         </div>
       )}
       {basket.locked && (
@@ -55,6 +58,7 @@ export function Inventory() {
       )}
       <Catalog
         disabled={basket.locked}
+        basketCount={issue ? basket.draft.lines.length : undefined}
         onAdd={
           issue
             ? (item) => {

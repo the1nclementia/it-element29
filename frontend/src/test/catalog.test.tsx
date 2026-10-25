@@ -25,6 +25,7 @@ let failPatch: boolean;
 beforeEach(() => {
   calls = [];
   failPatch = false;
+  localStorage.clear();
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, options?: RequestInit) => {
@@ -155,6 +156,49 @@ it('создаёт позицию без редактируемого остат
     min_stock: 0,
   });
   expect(JSON.parse(String(sent.options?.body))).not.toHaveProperty('balance');
+});
+
+it('показывает карточки по умолчанию и сохраняет выбранный режим без сброса поиска', async () => {
+  app('/inventory');
+  const events = userEvent.setup();
+  await screen.findByRole('link', { name: 'Позиция для проверки' });
+  const search = screen.getByLabelText('Поиск позиций');
+  await events.type(search, 'CAT');
+  expect(screen.getByRole('button', { name: 'Плитка' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await events.click(screen.getByRole('button', { name: 'Таблица' }));
+  expect(screen.getByRole('table')).toBeInTheDocument();
+  expect(search).toHaveValue('CAT');
+  expect(localStorage.getItem('warehouse.catalog.view')).toBe('table');
+  expect(
+    screen.getByRole('link', { name: 'Позиция для проверки' }),
+  ).toBeInTheDocument();
+});
+
+it('восстанавливает сохранённый режим и оставляет корзину доступной', async () => {
+  localStorage.setItem('warehouse.catalog.view', 'list');
+  app('/inventory');
+  const events = userEvent.setup();
+  await screen.findByRole('link', { name: 'Позиция для проверки' });
+  expect(
+    screen.getByRole('button', { name: 'Компактный список' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await events.click(
+    screen.getByRole('button', { name: 'Добавить в корзину CAT-1' }),
+  );
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'Позиция добавлена в корзину',
+  );
+  expect(
+    screen.getByRole('link', { name: 'Перейти в корзину' }),
+  ).toHaveAttribute('href', '/issues');
+  const basketLink = screen.getByRole('link', { name: 'Корзина (1)' });
+  expect(basketLink).toHaveAttribute('href', '/issues');
+  expect(basketLink.closest('[data-testid="catalog-sticky-actions"]')).toHaveClass(
+    'sticky',
+  );
 });
 it('stale version сохраняет редактируемую форму и отправляет версию', async () => {
   app('/inventory/items/item1');

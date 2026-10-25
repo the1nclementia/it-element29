@@ -99,6 +99,8 @@ function show(children: React.ReactNode) {
 }
 async function fill() {
   const events = userEvent.setup();
+  await screen.findByRole('option', { name: 'Картриджи' });
+  await screen.findByRole('option', { name: 'Производитель' });
   await events.selectOptions(screen.getByLabelText('Категория'), 'category');
   await events.selectOptions(screen.getByLabelText('Производитель'), 'maker');
   await events.type(screen.getByLabelText('Модель расходника'), 'Модель');
@@ -242,7 +244,7 @@ it('открывает компактный вложенный справочн�
     within(nested).getByRole('button', { name: 'Сохранить категорию' }),
   );
   expect(await within(nested).findByRole('alert')).toHaveTextContent(
-    'латинские буквы',
+    'корректный код категории либо оставьте код пустым для генерации',
   );
   expect(calls.some((call) => call.options?.method === 'POST')).toBe(false);
   await events.keyboard('{Escape}');
