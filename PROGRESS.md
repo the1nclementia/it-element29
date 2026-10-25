@@ -581,3 +581,17 @@ root-права/владельцы каталогов, flock, systemd, SSH, вн
 - Наложенные PNG-слои удалены, поэтому скобки больше не могут смещаться или давать
   чёрные дубли.
 - Браузерная проверка, `tsc -b`, Prettier и focused Vitest пройдены: **24 теста**.
+
+## Проверка и обновление основного Docker-контура (25.10.2026)
+
+- Полный frontend Vitest: **7 файлов, 49 тестов**; `tsc -b`, Prettier и
+  production Vite build пройдены. Build оставляет только предупреждение о размере
+  основного JS-чанка, без ошибки сборки.
+- Основной Compose-контур проверен: backend, frontend, PostgreSQL и proxy healthy;
+  volumes и база данных не изменялись, миграции не запускались.
+- Пересобран и перезапущен только `element29-frontend-1`; backend, PostgreSQL и
+  proxy не перезапускались. Через `http://127.0.0.1:8080/login` подтверждены
+  форма авторизации и новый дизайн.
+- Через основной proxy проверены `GET /api/v1/health/live` (**200**),
+  `GET /brand/wordmark-login.svg` (**200, image/svg+xml**) и
+  `GET /brand/login-hero-background.png` (**200, image/png**).
