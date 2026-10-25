@@ -16,7 +16,7 @@ export function LoginHeroBackdrop({ onFallback, onReady }: Props) {
     >
       <img
         className="login-hero-art-image"
-        src="/brand/login-hero-background.webp"
+        src="/brand/login-hero-background.png"
         alt=""
         onLoad={() => {
           setState('ready');

@@ -13,8 +13,8 @@ buttons or authorization UI, plus a restrained CSS light sweep. No new cubes,
 procedural geometry, WebGL, canvas or generated crop of the supplied screenshot is
 allowed. The current repository does not contain the required clean asset:
 `frontend/public/brand/login-hero.png` contains cropped text and is therefore not
-used as a background. The implementation is ready to consume
-`/brand/login-hero-background.webp`; until that asset is supplied, it deliberately
+used as a background. The implementation consumes
+`/brand/login-hero-background.png`; until that asset is supplied, it deliberately
 shows a neutral fallback and keeps the form fully functional.
 
 ## User-approved corrections (25.10.2026)

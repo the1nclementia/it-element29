@@ -6,7 +6,7 @@ describe('login hero backdrop', () => {
   it('loads only the clean decorative asset and exposes no form content', () => {
     const { container } = render(<LoginHeroBackdrop />);
     const image = container.querySelector('img')!;
-    expect(image).toHaveAttribute('src', '/brand/login-hero-background.webp');
+    expect(image).toHaveAttribute('src', '/brand/login-hero-background.png');
     expect(screen.queryByText(/войти|логин|пароль/i)).not.toBeInTheDocument();
   });
 
