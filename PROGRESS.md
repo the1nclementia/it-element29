@@ -534,3 +534,8 @@ root-права/владельцы каталогов, flock, systemd, SSH, вн
   без текста, логотипов и UI.
 - Проверки после перехода: `tsc -b` и Prettier проходят; Vitest не стартует из-за
   ограничения среды `spawn EPERM` в esbuild. Сборка не использует WebGL-код.
+- После получения clean PNG добавлена проверка видимости вкладки: световой sweep
+  останавливается при `document.visibilityState=hidden`, а изображение загружается
+  с async decoding и остаётся декоративным (`pointer-events: none`). `tsc -b` и
+  Prettier проходят; focused Vitest повторно заблокирован `spawn EPERM` при старте
+  esbuild.

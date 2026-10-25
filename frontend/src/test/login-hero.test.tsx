@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { LoginHeroBackdrop } from '../components/LoginHeroBackdrop';
 
 describe('login hero backdrop', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('loads only the clean decorative asset and exposes no form content', () => {
     const { container } = render(<LoginHeroBackdrop />);
     const image = container.querySelector('img')!;
@@ -15,5 +19,15 @@ describe('login hero backdrop', () => {
     const { container } = render(<LoginHeroBackdrop onFallback={onFallback} />);
     container.querySelector('img')!.dispatchEvent(new Event('error'));
     expect(onFallback).toHaveBeenCalledOnce();
+  });
+
+  it('pauses the light sweep while the document is hidden', () => {
+    const { container } = render(<LoginHeroBackdrop />);
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(container.firstElementChild).toHaveClass('login-hero-art-hidden');
   });
 });

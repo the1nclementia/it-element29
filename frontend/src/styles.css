@@ -179,6 +179,9 @@ a {
   animation: login-hero-light 14s ease-in-out infinite;
   opacity: 1;
 }
+.login-hero-art-hidden .login-hero-light-sweep {
+  animation-play-state: paused;
+}
 @keyframes login-hero-light {
   0%,
   100% {
