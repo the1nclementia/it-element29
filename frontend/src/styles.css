@@ -150,6 +150,46 @@ a {
     linear-gradient(138deg, #e8ddd6 0%, #f6f0ec 58%, #fbfafa 100%);
   pointer-events: none;
 }
+.login-hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: min(34rem, 88%);
+  padding: 2.25rem 2.5rem 2.5rem;
+  border: 1px solid #ffffff8c;
+  border-radius: 1.75rem;
+  background: linear-gradient(
+    105deg,
+    #fffaf7e8 0%,
+    #fffaf7b8 58%,
+    #fffaf700 100%
+  );
+  box-shadow: 0 18px 48px #7c38171c;
+  backdrop-filter: blur(3px);
+}
+.login-hero-copy h1,
+.login-hero-copy p,
+.login-hero-copy .login-hero-accent {
+  text-shadow: 0 1px 1px #ffffffb8;
+}
+.login-form-panel {
+  z-index: 1;
+}
+.login-form-panel::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -5.5rem;
+  width: 7rem;
+  background: linear-gradient(
+    90deg,
+    #fbfafaff 0%,
+    #fbfafaf2 36%,
+    #fbfafab0 68%,
+    #fbfafa00 100%
+  );
+  content: '';
+  pointer-events: none;
+}
 .login-hero-art-image {
   position: absolute;
   inset: 0;
@@ -208,11 +248,12 @@ a {
   .login-hero-art::after {
     position: absolute;
     inset: 0;
+    right: -2rem;
     background: linear-gradient(
       90deg,
       transparent 0%,
-      #fbfafa08 60%,
-      #fbfafa 100%
+      #fbfafa10 58%,
+      #fbfafa 96%
     );
     content: '';
   }
@@ -224,6 +265,9 @@ a {
   }
   .login-hero h1 {
     font-size: clamp(2.8rem, 3.6vw, 4.5rem);
+  }
+  .login-hero-copy {
+    margin-left: clamp(-1.5rem, -1.5vw, -0.5rem);
   }
 }
 [data-theme='dark'] .bg-white {

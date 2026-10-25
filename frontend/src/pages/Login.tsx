@@ -52,7 +52,7 @@ export function Login() {
             Корпоративная система учёта
           </span>
         </div>
-        <div className="relative my-auto max-w-lg py-20">
+        <div className="login-hero-copy relative my-auto max-w-lg py-20">
           <div className="mb-8 flex size-14 items-center justify-center rounded-2xl border border-white/80 bg-white/85 shadow-sm">
             <Layers3 className="size-7 text-primary" strokeWidth={1.5} />
           </div>
@@ -71,7 +71,7 @@ export function Login() {
           ИТ-элемент [29] · Для внутреннего использования
         </p>
       </section>
-      <section className="flex flex-col bg-white px-6 py-10 sm:px-12">
+      <section className="login-form-panel relative flex flex-col bg-white px-6 py-10 sm:px-12">
         <div className="mx-auto w-full max-w-sm">
           <Brand />
         </div>
