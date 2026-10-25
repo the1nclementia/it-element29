@@ -75,6 +75,7 @@ a {
   outline-offset: 3px;
 }
 .brand-window {
+  position: relative;
   display: flex;
   align-items: center;
   width: 196px;
@@ -86,6 +87,20 @@ a {
   display: block;
   width: 100%;
   height: auto;
+}
+.brand-window .brand-wordmark-base {
+  filter: grayscale(1) brightness(0.16);
+}
+.brand-window .brand-wordmark-bracket {
+  position: absolute;
+  inset: 0;
+  filter: none;
+}
+.brand-window .brand-wordmark-bracket-left {
+  clip-path: inset(0 20% 0 76%);
+}
+.brand-window .brand-wordmark-bracket-right {
+  clip-path: inset(0 0 0 96%);
 }
 .brand-mark {
   width: 40px;

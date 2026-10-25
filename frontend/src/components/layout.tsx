@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Archive,
@@ -14,10 +14,12 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   Monitor,
   PackageOpen,
   Settings,
   ShieldCheck,
+  Sun,
   Users,
   Wrench,
   X,
@@ -158,7 +160,23 @@ export function Brand({ compact = false }: { compact?: boolean }) {
     </span>
   ) : (
     <span className="brand-window">
-      <img src="/brand/wordmark-transparent.png" alt="ИТ-элемент [29]" />
+      <img
+        className="brand-wordmark-base"
+        src="/brand/wordmark-transparent.png"
+        alt="ИТ-элемент [29]"
+      />
+      <img
+        className="brand-wordmark-bracket brand-wordmark-bracket-left"
+        src="/brand/wordmark-transparent.png"
+        alt=""
+        aria-hidden="true"
+      />
+      <img
+        className="brand-wordmark-bracket brand-wordmark-bracket-right"
+        src="/brand/wordmark-transparent.png"
+        alt=""
+        aria-hidden="true"
+      />
     </span>
   );
 }
@@ -272,6 +290,13 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const location = useLocation();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const [dark, setDark] = useState(
+    () => window.localStorage.getItem('e29-theme') === 'dark',
+  );
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    window.localStorage.setItem('e29-theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
   const name =
     modules.find((module) => module.path === location.pathname)?.label ??
@@ -369,6 +394,15 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'}
+            aria-pressed={dark}
+            onClick={() => setDark((value) => !value)}
+          >
+            {dark ? <Sun /> : <Moon />}
+          </Button>
           <div className="hidden text-right sm:block">
             <p className="max-w-52 truncate text-sm font-medium">
               {user?.display_name}
