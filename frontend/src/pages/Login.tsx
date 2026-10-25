@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -13,6 +13,47 @@ import { Brand } from '../components/layout';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Field, Notice } from '../components/common';
+import { LoginHeroErrorBoundary } from '../components/LoginHeroErrorBoundary';
+import { shouldUseLoginHero } from '../features/login/loginHeroCapability';
+
+const LazyLoginHeroScene = lazy(() =>
+  import('../components/LoginHeroScene').then(({ LoginHeroScene }) => ({
+    default: LoginHeroScene,
+  })),
+);
+
+function canRenderWebgl() {
+  try {
+    const canvas = document.createElement('canvas');
+    return Boolean(
+      canvas.getContext('webgl2') ||
+      canvas.getContext('webgl') ||
+      canvas.getContext('experimental-webgl'),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function useLoginHeroCapability() {
+  const read = () =>
+    shouldUseLoginHero({
+      width: window.innerWidth,
+      coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)')
+        .matches,
+      webgl: canRenderWebgl(),
+    });
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    const update = () => setEnabled(read());
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return enabled;
+}
+
 export function Login() {
   const { user, login } = useAuth();
   const [pending, setPending] = useState(false);
@@ -20,6 +61,9 @@ export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const heroEligible = useLoginHeroCapability();
+  const [heroDisabled, setHeroDisabled] = useState(false);
+  const [heroReady, setHeroReady] = useState(false);
   if (user)
     return (
       <Navigate to={user.must_change_password ? '/settings' : '/'} replace />
@@ -39,24 +83,46 @@ export function Login() {
   }
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
-      <section className="relative hidden overflow-hidden bg-[#172b4d] px-16 py-12 text-white lg:flex lg:flex-col">
-        <div className="absolute inset-0 login-pattern" />
-        <div className="absolute -bottom-64 -left-52 size-[650px] rounded-full border border-white/10" />
-        <div className="absolute -bottom-40 -left-28 size-[450px] rounded-full border border-white/10" />
+      <section className="login-hero relative hidden overflow-hidden px-16 py-12 text-[#2F0F0F] lg:flex lg:flex-col">
+        <div
+          className="login-hero-fallback absolute inset-0"
+          aria-hidden="true"
+        />
+        {heroEligible && !heroDisabled && (
+          <div className={`login-hero-canvas ${heroReady ? 'is-ready' : ''}`}>
+            <LoginHeroErrorBoundary
+              onFallback={() => {
+                setHeroDisabled(true);
+                setHeroReady(false);
+              }}
+            >
+              <Suspense fallback={null}>
+                <LazyLoginHeroScene
+                  onFallback={() => {
+                    setHeroDisabled(true);
+                    setHeroReady(false);
+                  }}
+                  onReady={() => setHeroReady(true)}
+                />
+              </Suspense>
+            </LoginHeroErrorBoundary>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#FBFAFA]/95 via-[#FBFAFA]/35 to-transparent" />
         <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-blue-100">
-            <span className="size-1.5 rounded-full bg-orange-400" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#2F0F0F]/10 bg-white/70 px-3 py-1.5 text-xs text-[#2F0F0F] shadow-sm backdrop-blur">
+            <span className="size-1.5 rounded-full bg-[#FF6F1C]" />
             Корпоративная система учёта
           </span>
         </div>
         <div className="relative my-auto max-w-lg py-20">
           <div className="mb-8 flex size-14 items-center justify-center rounded-2xl border border-white/15 bg-white/5">
-            <Layers3 className="size-7 text-blue-200" strokeWidth={1.5} />
+            <Layers3 className="size-7 text-[#FF6F1C]" strokeWidth={1.5} />
           </div>
           <h1 className="text-[44px] font-semibold leading-[1.2] tracking-tight">
             Ваши ИТ-ресурсы.
             <br />
-            <span className="text-blue-300">Всё на своих местах.</span>
+            <span className="text-[#FF6F1C]">Всё на своих местах.</span>
           </h1>
           <p className="mt-6 max-w-sm text-base leading-7 text-slate-300">
             Единое пространство для команды: оборудование, расходные материалы и
@@ -64,7 +130,7 @@ export function Login() {
           </p>
           <div className="mt-10 h-1 w-12 rounded-full bg-orange-400" />
         </div>
-        <p className="relative text-xs text-slate-400">
+        <p className="relative text-xs text-[#6F6D6D]">
           ИТ-элемент [29] · Для внутреннего использования
         </p>
       </section>
@@ -73,7 +139,7 @@ export function Login() {
           <Brand />
         </div>
         <div className="mx-auto my-auto w-full max-w-sm py-16">
-          <div className="mb-6 flex size-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
+          <div className="mb-6 flex size-11 items-center justify-center rounded-xl bg-primary-light text-primary">
             <LockKeyhole className="size-5" />
           </div>
           <h2 className="text-3xl font-semibold tracking-tight">

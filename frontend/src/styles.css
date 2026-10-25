@@ -1,28 +1,45 @@
 @import 'tailwindcss';
 @theme inline {
-  --color-primary: #ff641c;
-  --color-primary-hover: #e95310;
-  --color-primary-light: #fff0e8;
-  --color-background: #f8f9fb;
-  --color-foreground: #151a23;
-  --color-muted: #788394;
-  --color-border: #e8edf2;
+  --color-primary: var(--brand-orange);
+  --color-primary-hover: var(--brand-orange-dark);
+  --color-primary-light: var(--brand-orange-soft);
+  --color-background: var(--surface-page);
+  --color-foreground: var(--brand-dark);
+  --color-muted: var(--text-muted);
+  --color-border: var(--line);
   --radius-xl: 1rem;
   --radius-2xl: 1.125rem;
 }
 :root {
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  color: #151a23;
-  background: #f8f9fb;
+  --brand-orange: #ff6f1c;
+  --brand-orange-dark: #d9540d;
+  --brand-orange-soft: #fff0e6;
+  --brand-brown: #2f0f0f;
+  --brand-gray: #b1b1b2;
+  --brand-teal: #306771;
+  --brand-apricot: #fea851;
+  --brand-coral: #ff9a60;
+  --surface-page: #fbfafa;
+  --surface: #ffffff;
+  --surface-muted: #efecea;
+  --text-muted: #6f6d6d;
+  --line: #e2dedb;
+  font-family: Manrope, 'Segoe UI', Arial, sans-serif;
+  color: var(--brand-brown);
+  background: var(--surface-page);
   --brand-watermark-opacity: 0.05;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+[data-theme='dark'] {
+  --surface-page: #211b1b;
+  --surface: #2f2727;
+  --surface-muted: #403838;
+  --brand-brown: #fffaf7;
+  --text-muted: #c6bdb9;
+  --line: #5a4d4a;
+  --brand-orange-soft: #4c2a1d;
 }
 * {
   box-sizing: border-box;
@@ -30,6 +47,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  background: var(--surface-page);
 }
 button,
 input,
@@ -50,10 +68,10 @@ a {
   text-decoration: none;
 }
 ::selection {
-  background: #ffe0ce;
+  background: #ff9a6066;
 }
 :focus-visible {
-  outline: 3px solid #e95310;
+  outline: 3px solid var(--brand-orange);
   outline-offset: 3px;
 }
 .brand-window {
@@ -87,7 +105,7 @@ a {
 .surface-card {
   border: 1px solid var(--color-border);
   border-radius: 16px;
-  background: white;
+  background: var(--surface);
   box-shadow: 0 4px 18px #151a2304;
 }
 .brand-watermark {
@@ -117,6 +135,45 @@ a {
 .login-pattern {
   background-image: radial-gradient(#ffffff16 1px, transparent 1px);
   background-size: 25px 25px;
+}
+.login-hero-fallback {
+  background:
+    radial-gradient(circle at 74% 36%, #fff8f0 0, #f5e7dc 34%, transparent 62%),
+    linear-gradient(132deg, #f8f4f0 0%, #eaded5 54%, #ddc9bc 100%);
+}
+.login-hero-fallback::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #fbfafa 0%, transparent 60%);
+  content: '';
+}
+.login-hero-canvas {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms ease;
+}
+.login-hero-canvas.is-ready {
+  opacity: 1;
+}
+.login-hero-scene,
+.login-hero-scene canvas {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+[data-theme='dark'] .bg-white {
+  background-color: var(--surface);
+}
+[data-theme='dark'] .bg-slate-50,
+[data-theme='dark'] .bg-slate-50\/70 {
+  background-color: var(--surface-muted);
+}
+[data-theme='dark'] .text-slate-400,
+[data-theme='dark'] .text-slate-500,
+[data-theme='dark'] .text-slate-600 {
+  color: var(--text-muted);
 }
 @media (prefers-reduced-motion: reduce) {
   *,
