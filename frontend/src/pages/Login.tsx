@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -14,45 +14,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Field, Notice } from '../components/common';
 import { LoginHeroErrorBoundary } from '../components/LoginHeroErrorBoundary';
-import { shouldUseLoginHero } from '../features/login/loginHeroCapability';
-
-const LazyLoginHeroScene = lazy(() =>
-  import('../components/LoginHeroScene').then(({ LoginHeroScene }) => ({
-    default: LoginHeroScene,
-  })),
-);
-
-function canRenderWebgl() {
-  try {
-    const canvas = document.createElement('canvas');
-    return Boolean(
-      canvas.getContext('webgl2') ||
-      canvas.getContext('webgl') ||
-      canvas.getContext('experimental-webgl'),
-    );
-  } catch {
-    return false;
-  }
-}
-
-function useLoginHeroCapability() {
-  const read = () =>
-    shouldUseLoginHero({
-      width: window.innerWidth,
-      coarsePointer: window.matchMedia('(pointer: coarse)').matches,
-      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)')
-        .matches,
-      webgl: canRenderWebgl(),
-    });
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    const update = () => setEnabled(read());
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  return enabled;
-}
+import { LoginHeroBackdrop } from '../components/LoginHeroBackdrop';
 
 export function Login() {
   const { user, login } = useAuth();
@@ -61,9 +23,6 @@ export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const heroEligible = useLoginHeroCapability();
-  const [heroDisabled, setHeroDisabled] = useState(false);
-  const [heroReady, setHeroReady] = useState(false);
   if (user)
     return (
       <Navigate to={user.must_change_password ? '/settings' : '/'} replace />
@@ -84,31 +43,9 @@ export function Login() {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.55fr_1fr]">
       <section className="login-hero relative hidden overflow-hidden px-16 py-12 text-[#2F0F0F] lg:flex lg:flex-col">
-        <div
-          className="login-hero-fallback absolute inset-0"
-          aria-hidden="true"
-        />
-        {heroEligible && !heroDisabled && (
-          <div className={`login-hero-canvas ${heroReady ? 'is-ready' : ''}`}>
-            <LoginHeroErrorBoundary
-              onFallback={() => {
-                setHeroDisabled(true);
-                setHeroReady(false);
-              }}
-            >
-              <Suspense fallback={null}>
-                <LazyLoginHeroScene
-                  onFallback={() => {
-                    setHeroDisabled(true);
-                    setHeroReady(false);
-                  }}
-                  onReady={() => setHeroReady(true)}
-                />
-              </Suspense>
-            </LoginHeroErrorBoundary>
-          </div>
-        )}
-        <div className="login-hero-wash absolute inset-0" />
+        <LoginHeroErrorBoundary onFallback={() => undefined}>
+          <LoginHeroBackdrop />
+        </LoginHeroErrorBoundary>
         <div className="relative">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#2F0F0F]/10 bg-white/70 px-3 py-1.5 text-xs text-[#2F0F0F] shadow-sm backdrop-blur">
             <span className="size-1.5 rounded-full bg-[#FF6F1C]" />

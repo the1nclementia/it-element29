@@ -136,49 +136,79 @@ a {
   background-image: radial-gradient(#ffffff16 1px, transparent 1px);
   background-size: 25px 25px;
 }
-.login-hero-fallback {
+.login-hero-art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   background:
     radial-gradient(
-      ellipse at 62% 48%,
+      ellipse at 58% 48%,
       #f7e4d7 0,
       #e9d5c9 42%,
       transparent 72%
     ),
     linear-gradient(138deg, #e8ddd6 0%, #f6f0ec 58%, #fbfafa 100%);
-}
-.login-hero-wash {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, #fbfafa12 0%, #fbfafa08 62%, #fbfafa 100%);
   pointer-events: none;
 }
-.login-hero-canvas {
+.login-hero-art-image {
   position: absolute;
   inset: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 420ms ease;
-}
-.login-hero-canvas.is-ready {
-  opacity: 1;
-}
-.login-hero-scene,
-.login-hero-scene canvas {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+.login-hero-art-ready .login-hero-art-image {
+  opacity: 1;
+}
+.login-hero-light-sweep {
+  position: absolute;
+  inset: -20% -30%;
+  background: linear-gradient(
+    112deg,
+    transparent 42%,
+    #ffb27a20 50%,
+    transparent 58%
+  );
+  opacity: 0;
+  transform: translateX(-8%);
   pointer-events: none;
+}
+.login-hero-art-ready .login-hero-light-sweep {
+  animation: login-hero-light 14s ease-in-out infinite;
+  opacity: 1;
+}
+@keyframes login-hero-light {
+  0%,
+  100% {
+    transform: translateX(-8%);
+    opacity: 0.16;
+  }
+  50% {
+    transform: translateX(8%);
+    opacity: 0.32;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-hero-art-ready .login-hero-light-sweep {
+    animation: none;
+  }
 }
 @media (min-width: 1024px) {
   .login-hero {
     background: #fbfafa;
   }
-  .login-hero-wash {
+  .login-hero-art::after {
+    position: absolute;
+    inset: 0;
     background: linear-gradient(
       90deg,
       transparent 0%,
       #fbfafa08 60%,
       #fbfafa 100%
     );
+    content: '';
   }
 }
 @media (min-width: 1280px) {

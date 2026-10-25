@@ -2,7 +2,20 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add a lazy-loaded, low-cost React Three Fiber hero scene to `/login` while preserving the existing static reference image, auth behavior, accessibility, and responsive fallback rules.
+**Goal:** Add a clean asset-first login hero to `/login` while preserving auth behavior,
+accessibility and responsive fallback rules.
+
+## Direction change (25.10.2026)
+
+The procedural R3F scene is removed from the login hero. The approved direction is
+an asset-first decorative backdrop: one clean PNG/WebP without text, logos, fields,
+buttons or authorization UI, plus a restrained CSS light sweep. No new cubes,
+procedural geometry, WebGL, canvas or generated crop of the supplied screenshot is
+allowed. The current repository does not contain the required clean asset:
+`frontend/public/brand/login-hero.png` contains cropped text and is therefore not
+used as a background. The implementation is ready to consume
+`/brand/login-hero-background.webp`; until that asset is supplied, it deliberately
+shows a neutral fallback and keeps the form fully functional.
 
 ## User-approved corrections (25.10.2026)
 
@@ -30,19 +43,22 @@
 - Existing security, performance, accessibility, backend isolation, cookie/CSRF,
   and no-runtime-font/CDN constraints remain unchanged.
 
-**Architecture:** `Login.tsx` owns the decorative shell, lazy boundary, and Error Boundary. `LoginHeroScene.tsx` first ships as a static composition for visual review; only after that review does it gain the separate animation layer. The existing PNG remains the first paint and fallback; the auth form remains independent HTML layered above the canvas.
+**Architecture:** `Login.tsx` owns the decorative shell and keeps the auth form
+independent HTML. `LoginHeroBackdrop.tsx` loads one clean PNG/WebP and applies a
+CSS-only light sweep. A missing or invalid asset leaves a neutral background; no
+procedural scene, WebGL canvas or screenshot crop is used.
 
-**Tech Stack:** React 19, TypeScript, Vite, `three`, `@react-three/fiber`, Vitest/jsdom, Playwright.
+**Tech Stack:** React 19, TypeScript, Vite, CSS animation, Vitest/jsdom, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-10-24-login-3d-scene-design.md`
 
 ## Global Constraints
 
-- Scene is enabled only at viewport width `>=1280px`, with no `pointer: coarse`, and `prefers-reduced-motion: no-preference`.
-- `devicePixelRatio` is capped at approximately `1.25`; no HDRI, postprocessing, physics, or continuous whole-composition rotation.
-- Canvas is decorative (`aria-hidden="true"`, no focus, no pointer interception); the form and auth contracts do not change.
-- Existing PNG and original logos remain; no CDN, runtime font loading, backend, database, migration, `.env`, volume, or secret changes.
-- On lazy import failure, missing WebGL, or context loss, return to the PNG without exposing sensitive data.
+- The decorative asset is shown only on the desktop layout; narrow/touch layouts keep the form fully usable.
+- No WebGL, canvas, HDRI, postprocessing, physics or procedural geometry is used.
+- The image and sweep are decorative (`aria-hidden="true"`, no focus, no pointer interception); the form and auth contracts do not change.
+- Original logos remain; no CDN, runtime font loading, backend, database, migration, `.env`, volume, or secret changes.
+- On asset load or render failure, keep the neutral background without exposing sensitive data.
 
 ## Review Focus
 
@@ -52,16 +68,15 @@
 - Lazy chunk failure must not block login — test the Suspense fallback and submit path in `frontend/src/test/app.test.tsx`.
 - Canvas must not capture input — test keyboard focus and form submission in the existing login tests and Playwright flow.
 
-### Task 1: Dependency and capability boundary
+### Task 1: Asset boundary
 
 **Files:**
-- Modify: `frontend/package.json`
-- Modify: `frontend/pnpm-lock.yaml`
-- Create: `frontend/src/features/login/loginHeroCapability.ts`
+- Modify: `frontend/src/components/LoginHeroBackdrop.tsx`
+- Add: `docs/LOGIN-HERO-ASSET.md`
 - Test: `frontend/src/test/login-hero.test.tsx`
 
 **Interfaces:**
-- Produces `shouldUseLoginHero({ width, coarsePointer, reducedMotion, webgl }) -> boolean` and a stable `LoginHeroCapability` input shape.
+- Produces an asset-only decorative backdrop with neutral fallback and no form content.
 
 - [ ] **Step 1: Write failing capability tests** for `1280` desktop/no-preference/WebGL true, `1279`, coarse pointer, reduced motion, and missing WebGL false.
 - [ ] **Step 2: Run `node_modules\\.bin\\vitest.cmd run src/test/login-hero.test.tsx` and verify the expected failures.**
@@ -107,10 +122,10 @@
 - [ ] **Step 3: Add media/capability state in the left panel, lazy-load the static scene, keep PNG visible until `onReady` confirms the first frame, and transition opacity without a flash. On callback or import/render error, disable the scene for that mount and leave PNG active.**
 - [ ] **Step 4: Re-run frontend tests and format changed files.**
 
-### Task 4: Animation layer after explicit visual approval
+### Task 4: Delicate image-light animation
 
 **Files:**
-- Modify: `frontend/src/components/LoginHeroScene.tsx`
+- Modify: `frontend/src/components/LoginHeroBackdrop.tsx`
 - Modify: `frontend/src/styles.css`
 - Test: `frontend/src/test/login-hero.test.tsx`
 
@@ -120,11 +135,8 @@
 
 - [ ] **Step 1: Add failing tests** for an actual ~30 FPS scheduler, visibility pause/resume, bounded inertial cursor perspective change of 1–2 degrees, and no pointer interception by the canvas.
 - [ ] **Step 2: Run the focused tests and verify they fail because animation is not yet implemented.**
-- [ ] **Step 3: Implement animation using React Three Fiber's `useFrame` with a
-  time accumulator (skip frames until at least ~33ms elapsed),
-  `document.visibilityState` pause, and pointer movement sampled on a
-  non-intercepting parent/overlay. Use damped target values clamped to ±1.5
-  degrees; never rotate the whole composition continuously.**
+- [x] **Step 3: Implement a very slow CSS light sweep over the image, disabled by
+  `prefers-reduced-motion`, without pointer interception or geometry movement.**
 - [ ] **Step 4: Re-run focused tests and verify performance guards.**
 
 ### Task 3: Login integration and static fallback
