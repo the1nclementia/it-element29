@@ -93,14 +93,19 @@ a {
 }
 .brand-window .brand-wordmark-bracket {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: auto;
+  transform: translateY(-50%);
   filter: none;
 }
 .brand-window .brand-wordmark-bracket-left {
-  clip-path: inset(0 20% 0 76%);
+  clip-path: inset(0 20.5% 0 76.5%);
 }
 .brand-window .brand-wordmark-bracket-right {
-  clip-path: inset(0 0 0 96%);
+  clip-path: inset(0 0 0 97.5%);
 }
 .brand-mark {
   width: 40px;
