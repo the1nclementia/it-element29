@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { LoginHeroBackdrop } from '../components/LoginHeroBackdrop';
 
 describe('login hero backdrop', () => {
@@ -21,13 +21,15 @@ describe('login hero backdrop', () => {
     expect(onFallback).toHaveBeenCalledOnce();
   });
 
-  it('pauses the light sweep while the document is hidden', () => {
+  it('pauses the light sweep while the document is hidden', async () => {
     const { container } = render(<LoginHeroBackdrop />);
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'hidden',
     });
     document.dispatchEvent(new Event('visibilitychange'));
-    expect(container.firstElementChild).toHaveClass('login-hero-art-hidden');
+    await waitFor(() => {
+      expect(container.firstElementChild).toHaveClass('login-hero-art-hidden');
+    });
   });
 });
